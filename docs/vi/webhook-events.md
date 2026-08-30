@@ -6,7 +6,7 @@ Tài liệu này bao gồm cách thiết lập webhook, xác minh chữ ký và 
 
 ## Thiết lập Webhook
 
-1. Truy c��p [Zalo Developer Platform](https://developers.zalo.me/)
+1. Truy cập [Zalo Developer Platform](https://developers.zalo.me/)
 2. Chọn OA của bạn
 3. Vào mục **"Webhook"** trong thanh bên
 4. Nhập URL webhook của bạn (phải là HTTPS)
