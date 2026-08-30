@@ -17,9 +17,9 @@ class ZaloApiError extends ZaloBotError {
   constructor(errorData) {
     const errorCode = errorData?.error || errorData?.error_code || -1;
     const rawMessage = errorData?.message || 'Unknown Zalo API error';
-    const vietnameseMessage = ZaloApiError.getErrorMessage(errorCode) || rawMessage;
+    const englishMessage = ZaloApiError.getErrorMessage(errorCode) || rawMessage;
 
-    super(`[Zalo API Error ${errorCode}]: ${vietnameseMessage}`, {
+    super(`[Zalo API Error ${errorCode}]: ${englishMessage}`, {
       code: errorCode,
       rawMessage,
       ...errorData
@@ -30,20 +30,20 @@ class ZaloApiError extends ZaloBotError {
 
   static getErrorMessage(code) {
     const errorMap = {
-      0: 'Thành công (Success)',
-      "-1": 'Lỗi không xác định từ hệ thống Zalo',
-      "-2": 'Dữ liệu truyền vào không hợp lệ (Invalid parameters)',
-      "-3": 'Access Token không hợp lệ hoặc đã hết hạn',
-      "-4": 'Ứng dụng không có quyền truy cập tính năng này',
-      "-5": 'Secret Key hoặc chữ ký xác thực không hợp lệ',
-      "-6": 'Tài khoản Zalo Bot bị khóa hoặc vô hiệu hóa',
-      "-7": 'Người dùng đã chặn bot hoặc chưa tương tác với bot',
-      "-8": 'File hoặc media upload vượt quá kích thước cho phép',
-      "-9": 'Đã vượt quá giới hạn tần suất gửi tin (Rate Limit Exceeded)',
-      "-10": 'Yêu cầu không được hỗ trợ hoặc endpoint không tồn tại',
-      "-11": 'Người dùng không tồn tại (User not found)',
-      "-12": 'Hết hạn thời gian phản hồi (Request Timeout)',
-      "-13": 'Lỗi phân giải định dạng nội dung gửi đi'
+      0: 'Success',
+      "-1": 'Unknown error from Zalo Bot service',
+      "-2": 'Invalid request parameters',
+      "-3": 'Access token is invalid or expired',
+      "-4": 'Application does not have permission for this feature',
+      "-5": 'Invalid secret key or webhook signature',
+      "-6": 'Zalo Bot account is locked or disabled',
+      "-7": 'User blocked the bot or has not interacted yet',
+      "-8": 'File or media payload exceeds maximum allowed size',
+      "-9": 'Rate limit exceeded, please slow down requests',
+      "-10": 'Unsupported request or endpoint not found',
+      "-11": 'Target user not found',
+      "-12": 'Request timed out waiting for upstream server',
+      "-13": 'Failed to parse payload content structure'
     };
     return errorMap[String(code)] || null;
   }
