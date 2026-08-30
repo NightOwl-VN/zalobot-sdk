@@ -306,4 +306,4 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for pu
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-Developed with ❤️ by [NightOwl VN](https://github.com/NightOwl-VN).
+Developed with ❤️ by [Hoang Khac Phuc](https://github.com/hoangkhacphuc).
