@@ -1,28 +1,28 @@
 ---
-name: Báo cáo lỗi (Bug report)
-about: Tạo báo cáo giúp chúng tôi cải thiện Zalo Bot SDK
+name: Bug report
+about: Create a report to help us improve Zalo Bot SDK
 title: '[BUG] '
 labels: bug
 assignees: ''
 ---
 
-**Mô tả lỗi:**
-Mô tả ngắn gọn và rõ ràng về lỗi bạn gặp phải.
+**Describe the bug**
+A clear and concise description of what the bug is.
 
-**Các bước tái hiện lỗi:**
-1. Khởi tạo bot với cấu hình '...'
-2. Gọi hàm '...'
-3. Gặp lỗi như sau: '...'
+**Steps to reproduce**
+1. Initialize bot with configuration '...'
+2. Call function '...'
+3. See error: '...'
 
-**Hành vi mong muốn:**
-Mô tả rõ những gì đáng lẽ phải diễn ra.
+**Expected behavior**
+A clear and concise description of what you expected to happen.
 
-**Thông tin môi trường:**
-- Node.js version: [VD: 20.x, 22.x]
-- OS: [VD: Ubuntu 24.04, macOS 15, Windows 11]
-- Phiên bản SDK: [VD: 1.0.0]
+**Environment information**
+- Node.js version: [e.g. 20.x, 22.x]
+- OS: [e.g. Ubuntu 24.04, macOS 15, Windows 11]
+- SDK version: [e.g. 1.0.0]
 
-**Log / Thông báo lỗi:**
+**Log / Error messages**
 ```text
-Dán log lỗi hoặc stack trace vào đây nếu có
+Paste error logs or stack traces here if available
 ```

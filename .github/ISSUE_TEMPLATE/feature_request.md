@@ -1,19 +1,19 @@
 ---
-name: Đề xuất tính năng (Feature request)
-about: Đề xuất ý tưởng hoặc tính năng mới cho Zalo Bot SDK
+name: Feature request
+about: Suggest an idea or new feature for Zalo Bot SDK
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
 ---
 
-**Tính năng của bạn có liên quan đến vấn đề gì không?**
-Mô tả ngắn gọn về bài toán hoặc khó khăn bạn đang gặp phải.
+**Is your feature request related to a problem?**
+A clear and concise description of what the problem is.
 
-**Mô tả tính năng đề xuất:**
-Mô tả rõ ràng về cách tính năng mới nên hoạt động.
+**Describe the solution you'd like**
+A clear and concise description of what you want to happen.
 
-**Các giải pháp thay thế đã cân nhắc:**
-Mô tả bất kỳ giải pháp thay thế nào bạn đã thử hoặc nghĩ tới.
+**Describe alternatives you've considered**
+A clear and concise description of any alternative solutions or features you've considered.
 
-**Thông tin bổ sung:**
-Bổ sung bất kỳ ngữ cảnh, tài liệu API Zalo Bot liên quan hoặc hình ảnh minh họa tại đây.
+**Additional context**
+Add any other context, related Zalo Bot API documentation, or screenshots about the feature request here.
