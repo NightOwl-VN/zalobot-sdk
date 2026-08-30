@@ -1,4 +1,10 @@
 /**
+ * @author  Hoang Khac Phuc
+ * @email   hoangkhacphuc.dev@gmail.com
+ * @github  https://github.com/hoangkhacphuc
+ */
+
+/**
  * Unit tests for ZaloClient and ZaloConfig
  * Tests: initialization, config validation, HTTP methods, and auto-retry logic
  * @module tests/client.test

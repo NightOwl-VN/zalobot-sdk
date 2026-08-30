@@ -1,4 +1,10 @@
 /**
+ * @author  Hoang Khac Phuc
+ * @email   hoangkhacphuc.dev@gmail.com
+ * @github  https://github.com/hoangkhacphuc
+ */
+
+/**
  * Message module - Send and manage Zalo messages
  * Based on Zalo Bot API documentation
  */

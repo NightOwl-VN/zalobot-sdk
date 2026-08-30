@@ -1,4 +1,10 @@
 /**
+ * @author  Hoang Khac Phuc
+ * @email   hoangkhacphuc.dev@gmail.com
+ * @github  https://github.com/hoangkhacphuc
+ */
+
+/**
  * Utility functions for formatting payloads and responses
  */
 

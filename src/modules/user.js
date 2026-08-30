@@ -1,4 +1,10 @@
 /**
+ * @author  Hoang Khac Phuc
+ * @email   hoangkhacphuc.dev@gmail.com
+ * @github  https://github.com/hoangkhacphuc
+ */
+
+/**
  * User module - Get user information and follower management
  * Based on Zalo Bot API documentation
  */

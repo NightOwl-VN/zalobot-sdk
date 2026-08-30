@@ -1,4 +1,10 @@
 /**
+ * @author  Hoang Khac Phuc
+ * @email   hoangkhacphuc.dev@gmail.com
+ * @github  https://github.com/hoangkhacphuc
+ */
+
+/**
  * Unit tests for WebhookModule
  * Tests: signature verification, event parsing, middleware
  * @module tests/modules/webhook

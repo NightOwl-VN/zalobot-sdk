@@ -1,4 +1,10 @@
 /**
+ * @author  Hoang Khac Phuc
+ * @email   hoangkhacphuc.dev@gmail.com
+ * @github  https://github.com/hoangkhacphuc
+ */
+
+/**
  * Mock HTTP server for Zalo Bot API testing
  * Simulates Zalo API responses for offline testing
  * @module tests/helpers/mock-server

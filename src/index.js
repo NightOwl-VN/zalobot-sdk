@@ -1,4 +1,10 @@
 /**
+ * @author  Hoang Khac Phuc
+ * @email   hoangkhacphuc.dev@gmail.com
+ * @github  https://github.com/hoangkhacphuc
+ */
+
+/**
  * Zalo Bot API SDK - Node.js library for Zalo Bot Platform
  * @module zalo-bot-sdk
  */

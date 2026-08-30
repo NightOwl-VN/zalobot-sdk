@@ -1,4 +1,10 @@
 /**
+ * @author  Hoang Khac Phuc
+ * @email   hoangkhacphuc.dev@gmail.com
+ * @github  https://github.com/hoangkhacphuc
+ */
+
+/**
  * Unit tests for MessageModule
  * Tests: sendText, sendImage, sendFile, sendSticker, sendTemplate, sendQuickReply
  * Uses mock server to simulate Zalo API responses
