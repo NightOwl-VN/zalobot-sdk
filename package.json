@@ -1,0 +1,24 @@
+{
+  "name": "zalobot-sdk",
+  "version": "1.0.0",
+  "description": "Node.js SDK for Zalo Bot API & Webhook Handler",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node examples/send-message.js"
+  },
+  "keywords": [
+    "zalo",
+    "bot",
+    "sdk",
+    "zalobot",
+    "webhook",
+    "oa"
+  ],
+  "author": "Hoàng Khắc Phúc",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "dotenv": "^17.4.2",
+    "form-data": "^4.0.6"
+  }
+}
