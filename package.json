@@ -1,10 +1,13 @@
 {
   "name": "zalobot-sdk",
   "version": "1.0.0",
-  "description": "Node.js SDK for Zalo Bot API & Webhook Handler",
+  "description": "A lightweight, modular Node.js SDK and Webhook handler for Zalo Bot API. Fully typed with JSDoc and ready for production.",
   "main": "src/index.js",
   "scripts": {
-    "test": "node examples/send-message.js"
+    "test": "node --test tests/**/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage tests/**/*.test.js",
+    "example:webhook": "node examples/express-webhook.js",
+    "example:send": "node examples/send-message.js"
   },
   "keywords": [
     "zalo",
@@ -12,10 +15,32 @@
     "sdk",
     "zalobot",
     "webhook",
-    "oa"
+    "oa",
+    "nodejs",
+    "javascript",
+    "express",
+    "bot-framework",
+    "zalo-bot-api",
+    "zalo-sdk"
   ],
-  "author": "Hoàng Khắc Phúc",
+  "author": "NightOwl VN <hoangkhacphuc.dev@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NightOwl-VN/zalobot-sdk.git"
+  },
+  "homepage": "https://github.com/NightOwl-VN/zalobot-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/NightOwl-VN/zalobot-sdk/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "src/",
+    "LICENSE",
+    "README.md"
+  ],
   "dependencies": {
     "axios": "^1.20.0",
     "dotenv": "^17.4.2",
