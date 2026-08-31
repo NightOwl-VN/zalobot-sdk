@@ -6,14 +6,14 @@ This guide will walk you through creating a Zalo bot, setting up the SDK, and de
 
 ## Step 1: Create a Zalo Bot
 
-1. Go to the [Zalo Developer Platform](https://developers.zalo.me/)
+1. Go to the [Zalo Developer Platform](https://bot.zapps.me/)
 2. Log in with your Zalo account
 3. Click **"Create Official Account"**
 4. Fill in your bot's name, category, and other required fields
 5. After creation, go to the **"Management"** tab
-6. In the **"Access Token"** section, copy your **Access Token** and **Secret Key**
+6. In the **"Bot Token"** section, copy your **Bot Token** and **Secret Key**
 
-> ⚠️ **Important:** Save these credentials securely. The Access Token is used for API authentication, and the Secret Key is required for webhook signature verification.
+> ⚠️ **Important:** Save these credentials securely. The Bot Token is used for API authentication, and the Secret Key is required for webhook signature verification.
 
 ---
 
@@ -32,7 +32,7 @@ yarn add zalobot-sdk
 Create a `.env` file in your project root:
 
 ```env
-ZALO_BOT_ACCESS_TOKEN=your_access_token_here
+ZALO_BOT_TOKEN=your_access_token_here
 ZALO_BOT_SECRET_KEY=your_secret_key_here
 ZALO_BOT_APP_ID=your_app_id_here  # optional
 ZALO_BOT_TIMEOUT=30000             # optional

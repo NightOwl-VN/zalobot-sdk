@@ -26,13 +26,13 @@ const {
  * @class ZaloBot
  * @example
  * const bot = new ZaloBot({
- *   accessToken: 'your_access_token',
- *   secretKey: 'your_secret_key',
+ *   botToken: '123456789:abc-xyz',
+ *   secretKey: 'your-secret-token',
  * });
- * 
+ *
  * // Send a message
- * await bot.message.sendText('user_id', 'Hello!');
- * 
+ * await bot.message.sendText('chat_id', 'Hello!');
+ *
  * // Handle webhook
  * app.post('/webhook', bot.webhook.middleware({
  *   async onEvent(event) {
@@ -43,11 +43,11 @@ const {
 class ZaloBot {
   /**
    * @param {Object} config - Configuration options
-   * @param {string} config.accessToken - Zalo OA access token (required)
-   * @param {string} [config.secretKey] - Secret key for webhook verification
+   * @param {string} config.botToken - Zalo Bot Token (required, e.g. "123456789:abc-xyz")
+   * @param {string} [config.secretKey] - Secret key for webhook verification (8-256 chars)
    * @param {number} [config.timeout=30000] - Request timeout in ms
    * @param {number} [config.maxRetries=3] - Max retry attempts on rate limit
-   * @param {string} [config.baseURL='https://graph.zalo.me/v2.0'] - API base URL
+   * @param {string} [config.baseURL] - Custom base URL (optional)
    */
   constructor(config) {
     const validatedConfig = new ZaloConfig(config);
@@ -58,7 +58,7 @@ class ZaloBot {
     // Initialize modules
     this.message = new MessageModule(this.client);
     this.user = new UserModule(this.client);
-    this.webhook = new WebhookModule(this.client, {
+    this.webhook = new WebhookModule({
       secretKey: validatedConfig.secretKey,
     });
     this.media = new MediaModule(this.client);
@@ -72,12 +72,12 @@ class ZaloBot {
   }
 
   /**
-   * Update access token at runtime
-   * @param {string} newToken - New access token
+   * Update bot token at runtime
+   * @param {string} newToken - New bot token
    */
-  setAccessToken(newToken) {
-    this.config.accessToken = newToken;
-    this.client.updateAccessToken(newToken);
+  setBotToken(newToken) {
+    this.config.botToken = newToken;
+    this.client.updateBotToken(newToken);
   }
 
   /**
@@ -114,3 +114,4 @@ module.exports = {
 
 // Default export for convenience
 module.exports.default = ZaloBot;
+

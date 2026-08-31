@@ -5,8 +5,8 @@
  */
 
 /**
- * Message module - Send and manage Zalo messages
- * Based on Zalo Bot API documentation
+ * Message module - Send and manage Zalo Bot messages
+ * API Reference: https://bot.zapps.me/docs/apis/sendMessage/
  */
 
 class MessageModule {
@@ -18,232 +18,184 @@ class MessageModule {
   }
 
   /**
-   * Send a text message to a user
-   * @param {string} userId - Recipient user ID
-   * @param {string} text - Message content (max 1000 characters)
+   * Send a text message to a user or chat
+   * @param {string} chatId - Recipient chat ID (user or group)
+   * @param {string} text - Message content (1-2000 characters)
    * @param {Object} [options] - Additional options
-   * @param {string} [options.quoteMessageId] - Message ID to reply to
-   * @param {boolean} [options.force=true] - Force send even if user hasn't interacted in 24h
-   * @returns {Promise<Object>} { message_id, ... }
+   * @param {string} [options.caption] - Optional caption for media (1-2000 chars)
+   * @returns {Promise<Object>} { ok: true, result: { message_id, date } }
    * @example
-   * await bot.message.sendText('123456789', 'Hello from Zalo Bot!');
+   * await bot.message.sendText('abc.xyz', 'Hello from Zalo Bot!');
    */
-  async sendText(userId, text, options = {}) {
-    if (!userId || typeof userId !== 'string') {
-      throw new Error('userId is required and must be a string');
+  async sendText(chatId, text, options = {}) {
+    if (!chatId || typeof chatId !== 'string') {
+      throw new Error('chatId is required and must be a string');
     }
     if (!text || typeof text !== 'string') {
       throw new Error('text is required and must be a string');
     }
-    if (text.length > 1000) {
-      throw new Error('Text message exceeds 1000 character limit');
+    if (text.length < 1 || text.length > 2000) {
+      throw new Error('Text must be between 1 and 2000 characters');
     }
 
     const payload = {
-      recipient: { user_id: userId },
-      message: { text },
-      ...(options.quoteMessageId && { quote_message_id: options.quoteMessageId }),
-      ...(options.force !== undefined && { force: options.force }),
+      chat_id: chatId,
+      text,
+      ...(options.caption && { caption: options.caption }),
     };
 
-    return this.client.post('/me/messages', payload);
+    return this.client.post('sendMessage', payload);
   }
 
   /**
-   * Send an image message
-   * @param {string} userId - Recipient user ID
-   * @param {string} attachmentId - ID of uploaded image (from media.upload)
+   * Send a photo message
+   * @param {string} chatId - Recipient chat ID
+   * @param {string} photo - Image URL
    * @param {Object} [options] - Additional options
-   * @param {string} [options.quoteMessageId] - Message ID to reply to
-   * @param {string} [options.caption] - Optional caption (max 1000 chars)
-   * @returns {Promise<Object>}
+   * @param {string} [options.caption] - Optional caption (1-2000 chars)
+   * @returns {Promise<Object>} { ok: true, result: { message_id, date } }
    */
-  async sendImage(userId, attachmentId, options = {}) {
-    if (!attachmentId || typeof attachmentId !== 'string') {
-      throw new Error('attachmentId is required');
+  async sendPhoto(chatId, photo, options = {}) {
+    if (!chatId || typeof chatId !== 'string') {
+      throw new Error('chatId is required');
+    }
+    if (!photo || typeof photo !== 'string') {
+      throw new Error('photo URL is required');
     }
 
     const payload = {
-      recipient: { user_id: userId },
-      message: {
-        attachment: {
-          type: 'image',
-          payload: {
-            attachment_id: attachmentId,
-            ...(options.caption && { caption: options.caption }),
-          },
-        },
-      },
-      ...(options.quoteMessageId && { quote_message_id: options.quoteMessageId }),
+      chat_id: chatId,
+      photo,
+      ...(options.caption && { caption: options.caption }),
     };
 
-    return this.client.post('/me/messages', payload);
-  }
-
-  /**
-   * Send a file message
-   * @param {string} userId - Recipient user ID
-   * @param {string} attachmentId - ID of uploaded file (from media.upload)
-   * @param {Object} [options] - Additional options
-   * @param {string} [options.quoteMessageId] - Message ID to reply to
-   * @param {string} [options.caption] - Optional caption (max 1000 chars)
-   * @returns {Promise<Object>}
-   */
-  async sendFile(userId, attachmentId, options = {}) {
-    if (!attachmentId || typeof attachmentId !== 'string') {
-      throw new Error('attachmentId is required');
-    }
-
-    const payload = {
-      recipient: { user_id: userId },
-      message: {
-        attachment: {
-          type: 'file',
-          payload: {
-            attachment_id: attachmentId,
-            ...(options.caption && { caption: options.caption }),
-          },
-        },
-      },
-      ...(options.quoteMessageId && { quote_message_id: options.quoteMessageId }),
-    };
-
-    return this.client.post('/me/messages', payload);
+    return this.client.post('sendPhoto', payload);
   }
 
   /**
    * Send a sticker message
-   * @param {string} userId - Recipient user ID
-   * @param {string} stickerId - Sticker ID (from Zalo sticker library)
-   * @param {Object} [options] - Additional options
-   * @param {string} [options.quoteMessageId] - Message ID to reply to
-   * @returns {Promise<Object>}
+   * @param {string} chatId - Recipient chat ID
+   * @param {string} sticker - Sticker ID from https://stickers.zaloapp.com/
+   * @returns {Promise<Object>} { ok: true, result: { message_id, date } }
    */
-  async sendSticker(userId, stickerId, options = {}) {
-    if (!stickerId || typeof stickerId !== 'string') {
-      throw new Error('stickerId is required');
+  async sendSticker(chatId, sticker) {
+    if (!chatId || typeof chatId !== 'string') {
+      throw new Error('chatId is required');
+    }
+    if (!sticker || typeof sticker !== 'string') {
+      throw new Error('sticker ID is required');
     }
 
     const payload = {
-      recipient: { user_id: userId },
-      message: {
-        attachment: {
-          type: 'sticker',
-          payload: { sticker_id: stickerId },
-        },
-      },
-      ...(options.quoteMessageId && { quote_message_id: options.quoteMessageId }),
+      chat_id: chatId,
+      sticker,
     };
 
-    return this.client.post('/me/messages', payload);
+    return this.client.post('sendSticker', payload);
   }
 
   /**
-   * Send a template message (buttons/quick replies)
-   * @param {string} userId - Recipient user ID
-   * @param {Object} template - Template payload
-   * @param {string} template.type - 'list' or 'button'
-   * @param {Array} template.elements - Template elements
-   * @param {Object} [options] - Additional options
-   * @param {string} [options.quoteMessageId] - Message ID to reply to
-   * @returns {Promise<Object>}
-   * @example
-   * await bot.message.sendTemplate('123456789', {
-   *   type: 'button',
-   *   elements: [
-   *     { title: 'Option 1', payload: 'btn1' },
-   *     { title: 'Option 2', payload: 'btn2' },
-   *   ]
-   * });
+   * Send a voice message
+   * @param {string} chatId - Recipient chat ID (1-1 only)
+   * @param {string} voiceUrl - .aac audio file URL
+   * @returns {Promise<Object>} { ok: true, result: { message_id, date } }
    */
-  async sendTemplate(userId, template, options = {}) {
-    if (!template || typeof template !== 'object') {
-      throw new Error('template is required and must be an object');
+  async sendVoice(chatId, voiceUrl) {
+    if (!chatId || typeof chatId !== 'string') {
+      throw new Error('chatId is required');
     }
-    if (!template.type || !['list', 'button'].includes(template.type)) {
-      throw new Error('template.type must be "list" or "button"');
-    }
-    if (!Array.isArray(template.elements) || template.elements.length === 0) {
-      throw new Error('template.elements must be a non-empty array');
+    if (!voiceUrl || typeof voiceUrl !== 'string') {
+      throw new Error('voiceUrl is required');
     }
 
     const payload = {
-      recipient: { user_id: userId },
-      message: {
-        attachment: {
-          type: 'template',
-          payload: {
-            template_type: template.type,
-            elements: template.elements,
-          },
-        },
-      },
-      ...(options.quoteMessageId && { quote_message_id: options.quoteMessageId }),
+      chat_id: chatId,
+      voice_url: voiceUrl,
     };
 
-    return this.client.post('/me/messages', payload);
+    return this.client.post('sendVoice', payload);
   }
 
   /**
-   * Send a quick reply message
-   * @param {string} userId - Recipient user ID
-   * @param {string} text - Message text
-   * @param {Array} quickReplies - Array of { title, payload } objects
-   * @param {Object} [options] - Additional options
-   * @param {string} [options.quoteMessageId] - Message ID to reply to
-   * @returns {Promise<Object>}
+   * Send a chat action (typing indicator)
+   * @param {string} chatId - Recipient chat ID
+   * @param {string} action - 'typing' or 'upload_photo'
+   * @returns {Promise<Object>} { ok: true }
    */
-  async sendQuickReply(userId, text, quickReplies, options = {}) {
-    if (!Array.isArray(quickReplies) || quickReplies.length === 0) {
-      throw new Error('quickReplies must be a non-empty array');
+  async sendChatAction(chatId, action) {
+    if (!chatId || typeof chatId !== 'string') {
+      throw new Error('chatId is required');
     }
-    if (quickReplies.length > 13) {
-      throw new Error('Maximum 13 quick replies allowed');
+    if (!action || typeof action !== 'string') {
+      throw new Error('action is required');
     }
 
     const payload = {
-      recipient: { user_id: userId },
-      message: {
-        text,
-        quick_replies: quickReplies.map(qr => ({
-          title: qr.title,
-          payload: qr.payload,
-          ...(qr.image_url && { image_url: qr.image_url }),
-        })),
-      },
-      ...(options.quoteMessageId && { quote_message_id: options.quoteMessageId }),
+      chat_id: chatId,
+      action,
     };
 
-    return this.client.post('/me/messages', payload);
+    return this.client.post('sendChatAction', payload);
   }
 
   /**
-   * Get message details by ID
-   * @param {string} messageId - Message ID to retrieve
-   * @returns {Promise<Object>} Message details
+   * Get bot info
+   * @returns {Promise<Object>} { ok: true, result: { id, account_name, account_type } }
    */
-  async getMessage(messageId) {
-    if (!messageId || typeof messageId !== 'string') {
-      throw new Error('messageId is required');
+  async getMe() {
+    return this.client.get('getMe');
+  }
+
+  /**
+   * Get updates (long polling) - only works if no webhook configured
+   * @param {Object} [options] - Options
+   * @param {number} [options.timeout=30] - Timeout in seconds
+   * @returns {Promise<Object>} Array of updates
+   */
+  async getUpdates(options = {}) {
+    const timeout = options.timeout || 30;
+    return this.client.get('getUpdates', { timeout });
+  }
+
+  /**
+   * Set webhook URL
+   * @param {string} url - HTTPS webhook URL
+   * @param {string} secretToken - Secret token for verification (8-256 chars)
+   * @returns {Promise<Object>} { ok: true, result: { url, updated_at, verification } }
+   */
+  async setWebhook(url, secretToken) {
+    if (!url || typeof url !== 'string') {
+      throw new Error('url is required');
     }
-    return this.client.get(`/me/messages/${messageId}`);
+    if (!secretToken || typeof secretToken !== 'string' || secretToken.length < 8 || secretToken.length > 256) {
+      throw new Error('secretToken must be 8-256 characters');
+    }
+
+    return this.client.post('setWebhook', { url, secretToken });
   }
 
   /**
-   * Get conversation history
-   * @param {Object} params - Query parameters
-   * @param {string} [params.userId] - Filter by user ID
-   * @param {number} [params.limit=50] - Number of messages (max 200)
-   * @param {string} [params.cursor] - Pagination cursor
-   * @returns {Promise<Object>} { data: [...], paging: {...} }
+   * Test webhook URL
+   * @returns {Promise<Object>} { ok: true, result: { ok, url, status_code, outcome, latency_ms, hint } }
    */
-  async getConversation(params = {}) {
-    const query = {
-      limit: params.limit || 50,
-      ...(params.userId && { user_id: params.userId }),
-      ...(params.cursor && { cursor: params.cursor }),
-    };
-    return this.client.get('/me/messages', query);
+  async testWebhook() {
+    return this.client.post('testWebhook');
+  }
+
+  /**
+   * Delete webhook configuration
+   * @returns {Promise<Object>} { ok: true, result: { url, updated_at } }
+   */
+  async deleteWebhook() {
+    return this.client.post('deleteWebhook');
+  }
+
+  /**
+   * Get current webhook info
+   * @returns {Promise<Object>} { ok: true, result: { url, updated_at } }
+   */
+  async getWebhookInfo() {
+    return this.client.get('getWebhookInfo');
   }
 }
 

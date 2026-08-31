@@ -6,14 +6,14 @@ Hướng dẫn này sẽ hướng dẫn bạn từng bước tạo bot Zalo, cà
 
 ## Bước 1: Tạo Bot Zalo
 
-1. Truy cập [Zalo Developer Platform](https://developers.zalo.me/)
+1. Truy cập [Zalo Developer Platform](https://bot.zapps.me/)
 2. Đăng nhập bằng tài khoản Zalo của bạn
 3. Nhấp vào **"Tạo tài khoản chính thức"**
 4. Điền tên bot, danh mục và các trường bắt buộc khác
 5. Sau khi tạo, vào tab **"Quản lý"**
-6. Tại mục **"Access Token"**, sao chép **Access Token** và **Secret Key**
+6. Tại mục **"Bot Token"**, sao chép **Bot Token** và **Secret Key**
 
-> ⚠️ **Quan trọng:** Lưu trữ các thông tin này một cách an toàn. Access Token dùng để xác thực API, Secret Key dùng để xác minh chữ ký webhook.
+> ⚠️ **Quan trọng:** Lưu trữ các thông tin này một cách an toàn. Bot Token dùng để xác thực API, Secret Key dùng để xác minh chữ ký webhook.
 
 ---
 
@@ -32,7 +32,7 @@ yarn add zalobot-sdk
 Tạo file `.env` trong thư mục dự án:
 
 ```env
-ZALO_BOT_ACCESS_TOKEN=your_access_token_here
+ZALO_BOT_TOKEN=your_access_token_here
 ZALO_BOT_SECRET_KEY=your_secret_key_here
 ZALO_BOT_APP_ID=your_app_id_here  # không bắt buộc
 ZALO_BOT_TIMEOUT=30000             # không bắt buộc

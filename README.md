@@ -2,13 +2,11 @@
 
 📚 **Documentation:** [English 🇺🇸](./docs/en/README.md) | [Tiếng Việt 🇻🇳](./docs/vi/README.md)
 
----
-
 [![npm version](https://img.shields.io/npm/v/zalobot-sdk.svg)](https://www.npmjs.com/package/zalobot-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js CI](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
-A lightweight, modular, and enterprise-ready Node.js SDK and Webhook handler for the [Zalo Bot Platform](https://bot.zapps.me/). Fully typed with JSDoc for rich IDE autocomplete, automatic retry handling on rate limits, and secure cryptographic webhook signature verification.
+A lightweight, modular, and enterprise-ready Node.js SDK and Webhook handler for the [Zalo Bot Platform](https://bot.zapps.me/). Fully typed with JSDoc for rich IDE autocomplete, automatic retry handling on rate limits, and secure webhook verification via `X-Bot-Api-Secret-Token`.
 
 ---
 
@@ -29,6 +27,7 @@ A lightweight, modular, and enterprise-ready Node.js SDK and Webhook handler for
   - [Media Module](#media-module-botmedia)
 - [Error Handling](#-error-handling)
 - [Environment Variables](#-environment-variables)
+- [Conventional Commits](#-conventional-commits)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -36,13 +35,15 @@ A lightweight, modular, and enterprise-ready Node.js SDK and Webhook handler for
 
 ## 🚀 Features
 
-- ✅ **Full API Coverage**: Text, Image, File, Sticker, Interactive Button Templates, and Quick Replies.
-- ✅ **Automatic Retries**: Built-in exponential backoff for HTTP `429 Too Many Requests` status codes.
-- ✅ **Cryptographic Security**: Timing-safe HMAC-SHA256 signature verification for incoming webhooks.
-- ✅ **Zero-Config with `.env`**: Out-of-the-box environment variable binding via `dotenv`.
-- ✅ **Modular Architecture**: Independent sub-modules with clean separation of concerns.
-- ✅ **Rich IntelliSense**: Comprehensive JSDoc annotations on every class, parameter, and method.
-- ✅ **Custom Error Hierarchy**: Categorized exceptions (`ZaloApiError`, `ZaloAuthError`, `ZaloValidationError`).
+- ✅ **Full API Coverage**: Text, Image, File, Sticker, Voice, Chat Actions, Templates, and Quick Replies
+- ✅ **Automatic Retries**: Built-in exponential backoff for HTTP `429 Too Many Requests` status codes
+- ✅ **Secure Webhook**: Token verification via `X-Bot-Api-Secret-Token` header (timing-safe comparison)
+- ✅ **Zero-Config with `.env`**: Out-of-the-box environment variable binding via `dotenv` (`ZALO_BOT_TOKEN`, `ZALO_BOT_SECRET`)
+- ✅ **Modular Architecture**: Independent sub-modules with clean separation of concerns
+- ✅ **Rich IntelliSense**: Comprehensive JSDoc annotations on every class, parameter, and method
+- ✅ **Custom Error Hierarchy**: Categorized exceptions (`ZaloApiError`, `ZaloAuthError`, `ZaloRateLimitError`)
+- ✅ **Conventional Commits**: Commit messages follow `type(scope)` format for changelog generation
+- ✅ **Cross-platform**: Works on Node.js 18+, with types for TypeScript
 
 ---
 
@@ -51,26 +52,28 @@ A lightweight, modular, and enterprise-ready Node.js SDK and Webhook handler for
 Follow this step-by-step guide to build, test, and deploy a production Zalo Bot from scratch.
 
 ### Step 1: Create a Zalo Bot
-1. Navigate to the [Zalo Developer Portal](https://developers.zalo.me/) or [Zalo Bot Platform Console](https://bot.zapps.me/).
-2. Log in with your Zalo account and navigate to **My Apps / Bot Console**.
-3. Click **Create New Bot** (or link an existing Zalo Official Account).
+
+1. Open the [Zalo Bot Platform Console](https://bot.zapps.me/)
+2. Log in with your Zalo account
+3. Click **Create New Bot**
 4. Fill in basic information:
-   - **Bot Display Name**
+   - **Bot Display Name**: Must start with prefix `Bot`, e.g. `Bot MyShop`
    - **Avatar & Cover Image**
    - **Category & Description**
-5. Save your application settings.
-
----
+5. Save your bot settings
+6. After creation, the system will send your **Bot Token** and **Secret Key** via Zalo message
 
 ### Step 2: Retrieve API Credentials
-1. In your bot dashboard, locate the **Settings** or **App Secret** tab.
-2. Copy the following credentials:
-   - **Access Token** (`ZALO_BOT_ACCESS_TOKEN`): The bearer token used to authenticate API requests.
-   - **Secret Key** (`ZALO_BOT_SECRET_KEY`): Used to verify the HMAC-SHA256 signature sent with every webhook event.
-   - **App ID** (`ZALO_BOT_APP_ID`): Your application unique identifier.
-3. Keep these secrets confidential. Never commit them to version control.
 
----
+1. In your bot dashboard, locate the **Settings** tab
+2. Copy the following credentials:
+
+| Credential | Description | Environment Variable |
+|------------|-------------|---------------------|
+| **Bot Token** (`ZALO_BOT_TOKEN`) | Used in API URL path: `https://bot-api.zaloplatforms.com/bot{BOT_TOKEN}/...` | `ZALO_BOT_TOKEN` |
+| **Secret Key** (`ZALO_BOT_SECRET`) | Used to verify webhook requests via `X-Bot-Api-Secret-Token` header | `ZALO_BOT_SECRET` |
+
+⚠️ **Important:** These secrets are confidential. Never commit them to version control or share publicly.
 
 ### Step 3: Installation & Configuration
 
@@ -78,232 +81,201 @@ Install the SDK in your Node.js project:
 
 ```bash
 npm install zalobot-sdk
-# or
-yarn add zalobot-sdk
-# or
-pnpm add zalobot-sdk
 ```
-
-Create a `.env` file in the root of your project:
-
-```env
-# .env
-ZALO_BOT_ACCESS_TOKEN=your_actual_access_token_here
-ZALO_BOT_SECRET_KEY=your_actual_secret_key_here
-PORT=3000
-BASE_URL=https://your-domain.com
-```
-
----
 
 ### Step 4: Local Testing & Webhook Setup
 
-Create an entry file `server.js` (or use the built-in example in `examples/express-webhook.js`):
+Since webhook URLs must be publicly accessible, use a tunnel service for local development:
 
-```javascript
-const express = require('express');
+| Service | Command | Notes |
+|---------|---------|-------|
+| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/tutorials/local-tunnel/) | `cloudflared tunnel --url http://localhost:3000` | Recommended |
+| [ngrok](https://ngrok.com/) | `ngrok http 3000` | Free tier available |
+| [localtunnel](https://localhost.tunnel.com/) | `npx localtunnel --port 3000` | |
+
+After tunnel is running, configure webhook:
+
+```bash
+# Set webhook URL
+await bot.message.setWebhook('https://your-tunnel-url.com/webhook', 'your-secret-token');
+
+// Test webhook
+const result = await bot.message.testWebhook();
+if (result.result.ok) {
+  console.log('Webhook configured successfully!');
+}
+```
+
+### Step 5: Deployment & Going to Production
+
+1. Ensure your server has a valid HTTPS certificate
+2. Configure webhook with your production domain
+3. Set environment variables in your deployment environment
+4. Monitor webhook logs for any errors
+5. Set up error tracking and alerting
+
+---
+
+## 📦 Quick Start
+
+```bash
+# 1. Install SDK
+npm install zalobot-sdk
+
+# 2. Create .env file
+cat > .env << 'EOF'
+ZALO_BOT_TOKEN=your_bot_token_here
+ZALO_BOT_SECRET=your_secret_token_here
+PORT=3000
+EOF
+
+# 3. Create a simple bot server
+cat > index.js << 'INDEXEOF'
+require('dotenv').config();
 const { ZaloBot } = require('zalobot-sdk');
 
+const bot = new ZaloBot({
+  botToken: process.env.ZALO_BOT_TOKEN,
+  secretKey: process.env.ZALO_BOT_SECRET,
+});
+
+// Simple webhook handler
+const express = require('express');
 const app = express();
 app.use(express.json());
 
-// Initialize SDK (automatically loads credentials from process.env)
-const bot = new ZaloBot();
-
-// Register the webhook endpoint
 app.post('/webhook', bot.webhook.middleware({
   async onEvent(event) {
-    console.log(`[Event: ${event.event}] from User: ${event.userId}`);
-
     if (event.event === 'user_text') {
-      const userMessage = event.message?.text || '';
-      // Echo the message back to the sender
-      await bot.message.sendText(event.userId, `Bot received: "${userMessage}"`);
+      await bot.message.sendText(event.chatId, `Bạn đã nói: "${event.message.text}"`);
     }
   }
 }));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Zalo Bot webhook listening on port ${PORT}`);
+app.listen(3000, () => {
+  console.log('🚀 Zalo Bot server running at http://localhost:3000');
+  console.log('🌐 Webhook URL: https://your-domain.com/webhook');
 });
+INDEXEOF
+
+# 4. Run
+node index.js
 ```
 
-#### Expose Local Server via Cloudflare Tunnels or Ngrok
-Zalo requires a public HTTPS URL to deliver webhook events. Expose port 3000:
+### Step 5: Send Your First Message
 
-**Option A — Using Cloudflare Tunnels (Recommended):**
-```bash
-cloudflared tunnel --url http://localhost:3000
-```
-
-**Option B — Using Ngrok:**
-```bash
-ngrok http 3000
-```
-
-Copy the generated HTTPS URL (e.g., `https://random-subdomain.ngrok-free.app`) and append `/webhook`:
-`https://random-subdomain.ngrok-free.app/webhook`
-
-Go to your **Zalo Bot Dashboard → Webhook Settings**, paste the URL, set your Secret Key, and click **Verify & Save**.
-
----
-
-### Step 5: Deployment & Going to Production
-
-When you are ready to publish your bot, deploy your server to any cloud or container platform.
-
-#### Deploying on Render / Railway / Fly.io / VPS
-1. **Repository Setup**: Push your application to a private GitHub repository.
-2. **Environment Variables**: In your cloud platform dashboard, add:
-   - `ZALO_BOT_ACCESS_TOKEN` = `<your_production_token>`
-   - `ZALO_BOT_SECRET_KEY` = `<your_production_secret>`
-   - `NODE_ENV` = `production`
-   - `PORT` = `3000`
-3. **Build & Start Commands**:
-   - Build Command: `npm install`
-   - Start Command: `node server.js`
-4. **Update Webhook URL**: Once deployed, update the Webhook URL in your Zalo Developer Console to point to your live domain:
-   `https://bot.yourcompany.com/webhook`
-5. **Switch to Active/Live**: Switch your Bot mode to **Active** / **Production** in the Zalo Developer Portal.
-
----
-
-## ⚡ Quick Start
-
-### 1. Zero-Config Initialization (via `.env`)
-```javascript
-const { ZaloBot } = require('zalobot-sdk');
-
-const bot = new ZaloBot();
-```
-
-### 2. Explicit Configuration
 ```javascript
 const { ZaloBot } = require('zalobot-sdk');
 
 const bot = new ZaloBot({
-  accessToken: 'YOUR_ZALO_BOT_ACCESS_TOKEN',
-  secretKey: 'YOUR_ZALO_BOT_SECRET_KEY',
-  timeout: 15000,
-  maxRetries: 3
+  botToken: process.env.ZALO_BOT_TOKEN,
+  secretKey: process.env.ZALO_BOT_SECRET,
 });
-```
 
-### 3. Sending Messages
-```javascript
-// Plain Text
-await bot.message.sendText('USER_ID', 'Hello from Zalo Bot SDK!');
+// Send text message
+await bot.message.sendText('user_chat_id', 'Xin chào! Bot hoạt động tốt rồi!');
 
-// Quick Reply Buttons
-await bot.message.sendQuickReply('USER_ID', 'Please select an option:', [
-  { title: 'Customer Support', payload: 'ACTION_SUPPORT' },
-  { title: 'Billing Inquiry', payload: 'ACTION_BILLING' }
-]);
-
-// Interactive Buttons / Templates
-await bot.message.sendTemplate('USER_ID', {
-  type: 'button',
-  elements: [
-    { title: 'Documentation', url: 'https://github.com/NightOwl-VN/zalobot-sdk' },
-    { title: 'Contact Us', payload: 'ACTION_CONTACT' }
-  ]
+// Send image
+await bot.message.sendPhoto('user_chat_id', 'https://example.com/image.jpg', {
+  caption: 'Hình ảnh minh họa'
 });
+
+// Send sticker
+await bot.message.sendSticker('user_chat_id', 'sticker-id-from-zaloapp-com');
+
+// Send voice (1-1 only)
+await bot.message.sendVoice('user_id', 'https://example.com/voice.aac');
 ```
 
 ---
 
-## 📚 API Reference
+## 🔧 API Reference
 
-### Message Module (`bot.message`)
-
-| Method | Parameters | Description |
-|---|---|---|
-| `sendText(userId, text, options)` | `userId: string`, `text: string`, `options?: Object` | Sends a plain text message. |
-| `sendImage(userId, attachmentId, options)` | `userId: string`, `attachmentId: string`, `options?: Object` | Sends an image message using an uploaded attachment ID. |
-| `sendFile(userId, attachmentId, options)` | `userId: string`, `attachmentId: string`, `options?: Object` | Sends a file attachment. |
-| `sendSticker(userId, stickerId, options)` | `userId: string`, `stickerId: string`, `options?: Object` | Sends a sticker from the Zalo sticker catalog. |
-| `sendTemplate(userId, template, options)` | `userId: string`, `template: Object`, `options?: Object` | Sends action button templates or list cards. |
-| `sendQuickReply(userId, text, replies, options)` | `userId: string`, `text: string`, `replies: Array`, `options?: Object` | Sends text with quick reply option pills. |
-| `getMessage(messageId)` | `messageId: string` | Retrieves message delivery metadata. |
-| `getConversation(params)` | `params?: { userId, limit, cursor }` | Retrieves conversation history. |
-
-### User Module (`bot.user`)
-
-| Method | Parameters | Description |
-|---|---|---|
-| `getProfile(userId, options)` | `userId: string`, `options?: { fields }` | Fetches a subscriber's public profile data. |
-| `getFollowers(params)` | `params?: { limit, cursor, fields }` | Retrieves a paginated list of followers. |
-| `isFollowing(userId)` | `userId: string` | Checks if a user is currently following the bot. |
-| `getProfileCached(userId, options)` | `userId: string`, `options?: { forceRefresh }` | Retrieves profile with built-in in-memory caching. |
-
-### Webhook Module (`bot.webhook`)
-
-| Method | Parameters | Description |
-|---|---|---|
-| `verifySignature(signature, rawBody, secretKey?)` | `signature: string`, `rawBody: string`, `secretKey?: string` | Performs timing-safe HMAC-SHA256 signature verification. |
-| `parseEvent(payload)` | `payload: Object` | Normalizes incoming webhook events into standard data structures. |
-| `middleware(options)` | `options?: { secretKey, verifySignature, onEvent }` | Express.js middleware for automated signature check and handling. |
-| `handle(handler, options?)` | `handler: Function`, `options?: Object` | Standalone handler function for custom routing frameworks. |
-
-### Media Module (`bot.media`)
-
-| Method | Parameters | Description |
-|---|---|---|
-| `uploadImage(file, options)` | `file: string \| Buffer`, `options?: Object` | Uploads an image file (`multipart/form-data`) to Zalo storage. |
-| `uploadFile(file, options)` | `file: string \| Buffer`, `options?: Object` | Uploads a general document or media file. |
-| `getMediaUrl(attachmentId, options)` | `attachmentId: string`, `options?: { redirect }` | Resolves public temporary URL for an attachment ID. |
-| `downloadMedia(attachmentId, savePath)` | `attachmentId: string`, `savePath: string` | Streams and writes media from Zalo servers to a local path. |
+- [Message Module](./docs/en/README.md#message-module-botmessage)
+- [User Module](./docs/en/README.md#user-module-botuser)
+- [Webhook Module](./docs/en/README.md#webhook-module-botwebhook)
+- [Media Module](./docs/en/README.md#media-module-botmedia)
 
 ---
 
-## 🛡️ Error Handling
+## 🗂️ Environment Variables
 
-The SDK exposes custom error classes mapped to Zalo platform response codes:
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `ZALO_BOT_TOKEN` | ✅ Yes | Bot Token from Zalo Bot Console | `123456789:abc-xyz` |
+| `ZALO_BOT_SECRET` | ✅ Yes | Secret key for webhook verification | `my-secret-8-chars-min` |
+| `PORT` | No | Server port (default: 3000) | `3000` |
 
-```javascript
-const { ZaloBot, ZaloApiError, ZaloAuthError, ZaloValidationError } = require('zalobot-sdk');
+⚠️ **Note:** The secret key must be 8-256 characters and must match the secret configured via `setWebhook()` on the Zalo Bot Platform.
 
-const bot = new ZaloBot();
+---
 
-try {
-  await bot.message.sendText('INVALID_USER_ID', 'Test message');
-} catch (error) {
-  if (error instanceof ZaloAuthError) {
-    console.error('Authentication Error: Invalid or expired Access Token');
-  } else if (error instanceof ZaloApiError) {
-    console.error(`Zalo API Error [${error.code}]:`, error.message);
-  } else if (error instanceof ZaloValidationError) {
-    console.error('Validation Error:', error.message);
-  } else {
-    console.error('Unexpected Error:', error);
-  }
-}
+## 📜 Conventional Commits
+
+All commit messages **must** follow the [Conventional Commits](https://conventionalcommits.org/) format:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+
+Type options:
+- feat:     A new feature
+- fix:      A bug fix
+- docs:     Documentation changes
+- style:    Code format changes (missing semicolons, formatting)
+- refactor: Code refactoring
+- test:     Adding or correcting tests
+- chore:    Routine tasks
+
+Example:
+git commit -m "feat(message): add sendVoice method"
+git commit -m "fix(webhook): fix timing-safe-equal length check"
+git commit -m "docs(api): update sendMessage parameter description"
+git commit -m "refactor(client): use botToken in URL instead of header"
 ```
 
 ---
 
-## ⚙️ Environment Variables
+## 👥 Contributing
 
-| Variable | Type | Default | Description |
-|---|---|---|---|
-| `ZALO_BOT_ACCESS_TOKEN` | `string` | *Required* | Bearer Access Token from Zalo Bot Portal |
-| `ZALO_BOT_SECRET_KEY` | `string` | `null` | Webhook verification Secret Key |
-| `ZALO_BOT_APP_ID` | `string` | `null` | Zalo Application ID |
-| `ZALO_BOT_TIMEOUT` | `number` | `30000` | HTTP request timeout in milliseconds |
-| `ZALO_BOT_MAX_RETRIES` | `number` | `3` | Maximum retry attempts upon receiving HTTP 429 |
-| `ZALO_BOT_BASE_URL` | `string` | `https://graph.zalo.me/v2.0` | Base API URL |
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/foo-bar`
+3. Commit your changes following the [Conventional Commits](https://conventionalcommits.org/) format
+4. Push to the branch: `git push origin feature/foo-bar`
+5. Open a Pull Request
 
----
+**Development Guidelines:**
 
-## 🤝 Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for pull request guidelines, coding standards, and issue reporting.
+- Add JSDoc annotations for all new public methods
+- Add unit tests for new functionality
+- Run `npm run lint` before committing
+- Ensure all tests pass: `npm test`
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** - see the [LICENSE](./LICENSE) file for details.
 
-Developed with ❤️ by [Hoang Khac Phuc](https://github.com/hoangkhacphuc).
+Copyright (c) 2026 Hoang Khac Phuc
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -6,7 +6,7 @@ Tài liệu này bao gồm cách thiết lập webhook, xác minh chữ ký và 
 
 ## Thiết lập Webhook
 
-1. Truy cập [Zalo Developer Platform](https://developers.zalo.me/)
+1. Truy cập [Zalo Bot Platform](https://bot.zapps.me/)
 2. Chọn OA của bạn
 3. Vào mục **"Webhook"** trong thanh bên
 4. Nhập URL webhook của bạn (phải là HTTPS)
@@ -18,7 +18,7 @@ Tài liệu này bao gồm cách thiết lập webhook, xác minh chữ ký và 
 
 ## Xác minh Chữ ký
 
-Zalo gửi chữ ký HMAC-SHA256 trong header `X-Zalo-Signature`. SDK tự động xử lý xác minh khi bạn sử dụng middleware tích hợp.
+Zalo Bot gửi secret token trong header `X-Bot-Api-Secret-Token`. SDK tự động xử lý xác minh khi bạn sử dụng middleware tích hợp.
 
 ```javascript
 const express = require('express');
@@ -152,7 +152,7 @@ app.post('/webhook', bot.webhook.middleware({
 
 | Vấn đề | Giải pháp |
 |--------|-----------|
-| `401 Chữ ký không hợp lệ` | Kiểm tra `secretKey` khớp với Zalo Developer Platform |
+| `401 Chữ ký không hợp lệ` | Kiểm tra `secretKey` khớp với Zalo Bot Platform |
 | `URL Webhook không truy cập được` | Đảm bảo server công khai và dùng HTTPS |
 | `Timeout` | Phản hồi 200 OK ngay, xử lý bất đồng bộ |
 | `Sự kiện trùng lặp` | Zalo có thể gửi trùng — làm handler idempotent |

@@ -6,120 +6,98 @@
 
 /**
  * Unit tests for WebhookModule
- * Tests: signature verification, event parsing, middleware
+ * Tests: token verification, event parsing, middleware
  * @module tests/modules/webhook
  */
 
 const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const crypto = require('crypto');
 
 const WebhookModule = require('../../src/modules/webhook');
-
-/**
- * Helper: Compute HMAC-SHA256 signature for a given body and secret
- * @param {string} body - Raw body string
- * @param {string} secret - Secret key
- * @returns {string} Hex-encoded signature
- */
-function computeSignature(body, secret) {
-  return crypto.createHmac('sha256', secret).update(body).digest('hex');
-}
 
 describe('WebhookModule', () => {
   let webhookModule;
   const SECRET_KEY = 'my-secret-key-for-testing';
 
   /**
-   * Initialize WebhookModule with a mock client and secret key
+   * Initialize WebhookModule with a secret key
    */
   beforeEach(() => {
-    webhookModule = new WebhookModule(
-      { secretKey: SECRET_KEY },
-      { secretKey: SECRET_KEY }
-    );
+    webhookModule = new WebhookModule({ secretKey: SECRET_KEY });
   });
 
-  // ── verifySignature ───────────────────────────────
+  // ── verify ────────────────────────────────────────
 
-  describe('verifySignature()', () => {
+  describe('verify()', () => {
     /**
-     * Test: Valid signature returns true
+     * Test: Valid token returns true
      */
-    it('should return true for valid signature', () => {
-      const body = '{"event_name":"user_text"}';
-      const sig = computeSignature(body, SECRET_KEY);
-
-      const result = webhookModule.verifySignature(sig, body);
+    it('should return true for valid token', () => {
+      const req = {
+        headers: { 'x-bot-api-secret-token': SECRET_KEY },
+      };
+      const result = webhookModule.verify(req);
       assert.equal(result, true);
     });
 
     /**
-     * Test: Invalid signature returns false
+     * Test: Invalid token returns false
      */
-    it('should return false for invalid signature', () => {
-      const body = '{"event_name":"user_text"}';
-      const result = webhookModule.verifySignature('bad_signature_hex', body);
+    it('should return false for invalid token', () => {
+      const req = {
+        headers: { 'x-bot-api-secret-token': 'wrong_token' },
+      };
+      const result = webhookModule.verify(req);
       assert.equal(result, false);
     });
 
     /**
-     * Test: Throws when no secret key is configured
+     * Test: Returns true when no secret key is configured
      */
-    it('should throw when secret key is not configured', () => {
-      const noKeyModule = new WebhookModule({}, {});
-      assert.throws(
-        () => noKeyModule.verifySignature('sig', 'body'),
-        /Secret key is required/
-      );
+    it('should return true when no secret key is configured', () => {
+      const noKeyModule = new WebhookModule({});
+      const req = { headers: {} };
+      assert.equal(noKeyModule.verify(req), true);
     });
 
     /**
-     * Test: Returns false when signature is null
+     * Test: Returns false when token header is missing
      */
-    it('should return false when signature is null', () => {
-      assert.equal(webhookModule.verifySignature(null, '{}'), false);
+    it('should return false when token header is missing', () => {
+      const req = { headers: {} };
+      const result = webhookModule.verify(req);
+      assert.equal(result, false);
     });
 
     /**
-     * Test: Returns false when rawBody is null
+     * Test: Returns false when token is empty string
      */
-    it('should return false when rawBody is null', () => {
-      assert.equal(webhookModule.verifySignature('abcdef', null), false);
-    });
-
-    /**
-     * Test: Uses override secret key when provided
-     */
-    it('should use override secretKey when provided', () => {
-      const overrideSecret = 'override-key';
-      const body = '{"data":"test"}';
-      const sig = computeSignature(body, overrideSecret);
-
-      const result = webhookModule.verifySignature(sig, body, overrideSecret);
-      assert.equal(result, true);
+    it('should return false when token is empty string', () => {
+      const req = { headers: { 'x-bot-api-secret-token': '' } };
+      const result = webhookModule.verify(req);
+      assert.equal(result, false);
     });
   });
 
-  // ── requireValidSignature ─────────────────────────
+  // ── requireValid ──────────────────────────────────
 
-  describe('requireValidSignature()', () => {
+  describe('requireValid()', () => {
     /**
-     * Test: Does not throw for valid signature
+     * Test: Does not throw for valid token
      */
-    it('should not throw for valid signature', () => {
-      const body = '{"ok":true}';
-      const sig = computeSignature(body, SECRET_KEY);
-      assert.doesNotThrow(() => webhookModule.requireValidSignature(sig, body));
+    it('should not throw for valid token', () => {
+      const req = { headers: { 'x-bot-api-secret-token': SECRET_KEY } };
+      assert.doesNotThrow(() => webhookModule.requireValid(req));
     });
 
     /**
-     * Test: Throws for invalid signature
+     * Test: Throws for invalid token
      */
-    it('should throw for invalid signature', () => {
+    it('should throw for invalid token', () => {
+      const req = { headers: { 'x-bot-api-secret-token': 'wrong' } };
       assert.throws(
-        () => webhookModule.requireValidSignature('wrong', 'body'),
-        /Invalid webhook signature/
+        () => webhookModule.requireValid(req),
+        /Invalid webhook secret token/
       );
     });
   });
@@ -128,76 +106,102 @@ describe('WebhookModule', () => {
 
   describe('parseEvent()', () => {
     /**
-     * Test: Parse user_text event
+     * Test: Parse Zalo Bot message.text.received event
      */
-    it('should parse user_text event correctly', () => {
+    it('should parse message.text.received event correctly', () => {
       const payload = {
-        event_name: 'user_text',
-        sender: { id: '12345' },
-        message_id: 'msg_001',
-        message: { text: 'Hello bot' },
-        timestamp: 1700000000,
-      };
-
-      const event = webhookModule.parseEvent(payload);
-      assert.equal(event.event, 'user_text');
-      assert.equal(event.userId, '12345');
-      assert.equal(event.messageId, 'msg_001');
-      assert.equal(event.message.text, 'Hello bot');
-      assert.equal(event.timestamp, 1700000000);
-      assert.deepEqual(event.raw, payload);
-    });
-
-    /**
-     * Test: Parse user_quick_reply event
-     */
-    it('should parse user_quick_reply event correctly', () => {
-      const payload = {
-        event_name: 'user_quick_reply',
-        sender: { id: '67890' },
-        message_id: 'msg_002',
-        message: {
-          text: 'I choose A',
-          quick_reply: { payload: 'option_a' },
+        ok: true,
+        result: {
+          event_name: 'message.text.received',
+          message: {
+            from: { id: '0e7279ebd6a13fff66b0', display_name: 'Hoàng', is_bot: false },
+            chat: { id: '0e7279ebd6a13fff66b0', chat_type: 'PRIVATE' },
+            text: 'Hello bot',
+            message_id: '6003008fbd02235b7a14',
+            date: 1788139617411,
+          },
         },
       };
 
       const event = webhookModule.parseEvent(payload);
-      assert.equal(event.event, 'user_quick_reply');
-      assert.equal(event.userId, '67890');
-      assert.equal(event.message.text, 'I choose A');
-      assert.equal(event.message.quickReply.payload, 'option_a');
+      assert.equal(event.event, 'user_text');
+      assert.equal(event.userId, '0e7279ebd6a13fff66b0');
+      assert.equal(event.chatId, '0e7279ebd6a13fff66b0');
+      assert.equal(event.messageId, '6003008fbd02235b7a14');
+      assert.equal(event.message.text, 'Hello bot');
+      assert.deepEqual(event.raw, payload);
     });
 
     /**
-     * Test: Parse user_follow event
+     * Test: Parse flat payload (no result wrapper)
      */
-    it('should parse user_follow event correctly', () => {
+    it('should parse flat payload (no result wrapper)', () => {
       const payload = {
-        event_name: 'user_follow',
-        sender: { id: '11111' },
-        follow: { action: 'follow', source: 'qr_code' },
+        event_name: 'message.text.received',
+        message: {
+          from: { id: 'user123' },
+          chat: { id: 'user123', chat_type: 'PRIVATE' },
+          text: 'Hi there',
+          message_id: 'msg_001',
+          date: 1700000000,
+        },
       };
 
       const event = webhookModule.parseEvent(payload);
-      assert.equal(event.event, 'user_follow');
-      assert.equal(event.userId, '11111');
-      assert.equal(event.follow.action, 'follow');
-      assert.equal(event.follow.source, 'qr_code');
+      assert.equal(event.event, 'user_text');
+      assert.equal(event.userId, 'user123');
+      assert.equal(event.chatId, 'user123');
+      assert.equal(event.messageId, 'msg_001');
+      assert.equal(event.message.text, 'Hi there');
     });
 
     /**
-     * Test: Parse user_unfollow event
+     * Test: Parse image event
      */
-    it('should parse user_unfollow event correctly', () => {
+    it('should parse message.image.received event correctly', () => {
       const payload = {
-        event_name: 'user_unfollow',
-        sender: { id: '22222' },
+        ok: true,
+        result: {
+          event_name: 'message.image.received',
+          message: {
+            from: { id: 'user456' },
+            chat: { id: 'user456' },
+            photo: 'https://example.com/photo.jpg',
+            caption: 'Nice photo',
+            message_id: 'img_001',
+            date: 1700000000,
+          },
+        },
       };
 
       const event = webhookModule.parseEvent(payload);
-      assert.equal(event.event, 'user_unfollow');
-      assert.equal(event.unfollow, true);
+      assert.equal(event.event, 'user_image');
+      assert.equal(event.userId, 'user456');
+      assert.equal(event.message.photo, 'https://example.com/photo.jpg');
+      assert.equal(event.message.caption, 'Nice photo');
+    });
+
+    /**
+     * Test: Parse sticker event
+     */
+    it('should parse message.sticker.received event correctly', () => {
+      const payload = {
+        ok: true,
+        result: {
+          event_name: 'message.sticker.received',
+          message: {
+            from: { id: 'user789' },
+            chat: { id: 'user789' },
+            sticker: 'sticker-id-abc',
+            message_id: 'stk_001',
+            date: 1700000000,
+          },
+        },
+      };
+
+      const event = webhookModule.parseEvent(payload);
+      assert.equal(event.event, 'user_sticker');
+      assert.equal(event.message.sticker, 'sticker-id-abc');
     });
 
     /**
@@ -215,18 +219,18 @@ describe('WebhookModule', () => {
      */
     it('should throw when event_name is missing', () => {
       assert.throws(
-        () => webhookModule.parseEvent({ sender: { id: '1' } }),
+        () => webhookModule.parseEvent({ message: { from: { id: '1' } } }),
         /Missing event_name/
       );
     });
 
     /**
-     * Test: Throws when sender id is missing
+     * Test: Throws when from.id is missing
      */
-    it('should throw when sender id is missing', () => {
+    it('should throw when from.id is missing', () => {
       assert.throws(
-        () => webhookModule.parseEvent({ event_name: 'user_text' }),
-        /Missing sender\/user ID/
+        () => webhookModule.parseEvent({ event_name: 'message.text.received' }),
+        /Missing sender user ID/
       );
     });
   });
@@ -235,56 +239,64 @@ describe('WebhookModule', () => {
 
   describe('middleware()', () => {
     /**
-     * Test: Middleware returns 200 for valid webhook
+     * Test: Middleware returns 200 for valid webhook request
      */
     it('should return 200 for valid webhook request', async () => {
       const payload = {
-        event_name: 'user_text',
-        sender: { id: '12345' },
-        message: { text: 'Hi' },
+        ok: true,
+        result: {
+          event_name: 'message.text.received',
+          message: {
+            from: { id: 'user123' },
+            chat: { id: 'user123' },
+            text: 'Hi',
+            message_id: 'msg_001',
+            date: 1700000000,
+          },
+        },
       };
-      const rawBody = JSON.stringify(payload);
-      const sig = computeSignature(rawBody, SECRET_KEY);
 
       const middleware = webhookModule.middleware({
-        async onEvent(event) {
-          // Event handler callback
-        },
+        async onEvent(event) {},
       });
 
-      // Mock req/res/next
       let statusCode = 0;
       let responseBody = null;
       const req = {
-        headers: { 'x-zalo-signature': sig },
+        headers: { 'x-bot-api-secret-token': SECRET_KEY },
         body: payload,
       };
       const res = {
         status(code) { statusCode = code; return this; },
         json(data) { responseBody = data; },
       };
-      const next = () => {};
 
-      await middleware(req, res, next);
+      await middleware(req, res, () => {});
       assert.equal(statusCode, 200);
-      assert.deepEqual(responseBody, { success: true });
+      assert.deepEqual(responseBody, { message: 'Success' });
     });
 
     /**
-     * Test: Middleware returns 401 for invalid signature
+     * Test: Middleware returns 403 for invalid secret token
      */
-    it('should return 401 for invalid signature', async () => {
+    it('should return 403 for invalid secret token', async () => {
       const payload = {
-        event_name: 'user_text',
-        sender: { id: '12345' },
-        message: { text: 'Hi' },
+        ok: true,
+        result: {
+          event_name: 'message.text.received',
+          message: {
+            from: { id: 'user123' },
+            chat: { id: 'user123' },
+            text: 'Hi',
+          },
+        },
       };
 
       const middleware = webhookModule.middleware();
 
       let statusCode = 0;
       const req = {
-        headers: { 'x-zalo-signature': 'wrong_signature' },
+        headers: { 'x-bot-api-secret-token': 'wrong_token' },
         body: payload,
       };
       const res = {
@@ -293,7 +305,7 @@ describe('WebhookModule', () => {
       };
 
       await middleware(req, res, () => {});
-      assert.equal(statusCode, 401);
+      assert.equal(statusCode, 403);
     });
   });
 });

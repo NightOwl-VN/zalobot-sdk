@@ -5,84 +5,106 @@
  */
 
 /**
- * Configuration validation and management for Zalo Bot SDK
+ * Configuration for Zalo Bot SDK
+ * Supports both environment variables and manual configuration
+ * Reference: https://bot.zapps.me/docs/
  */
+
+const path = require('path');
+
+// Auto-load .env if dotenv is available and .env file exists
+try {
+  require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
+} catch (_e) {
+  // dotenv not available — proceed without auto-loading
+}
 
 class ZaloConfig {
   /**
-   * @param {Object} options
-   * @param {string} options.accessToken - Zalo OA access token (required)
-   * @param {string} [options.secretKey] - Secret key for webhook signature verification
-   * @param {number} [options.timeout=30000] - Request timeout in ms
+   * Create a new configuration instance
+   * @param {Object} [options] - Configuration options (overrides env vars)
+   * @param {string} [options.botToken] - Zalo Bot Token (required)
+   * @param {string} [options.secretKey] - Secret token for webhook verification
+   * @param {number} [options.timeout=30000] - Request timeout in milliseconds
    * @param {number} [options.maxRetries=3] - Max retry attempts on rate limit
-   * @param {string} [options.baseURL='https://graph.zalo.me/v2.0'] - API base URL
+   * @example
+   * const config = new ZaloConfig({
+   *   botToken: process.env.ZALO_BOT_TOKEN,
+   *   secretKey: process.env.ZALO_BOT_SECRET,
+   * });
    */
   constructor(options = {}) {
-    this._validate(options);
+    // Merge options with environment variables (options take precedence)
+    this.botToken = options.botToken
+      || process.env.ZALO_BOT_TOKEN
+      || process.env.BOT_TOKEN
+      || null;
 
-    this.accessToken = options.accessToken;
-    this.secretKey = options.secretKey || null;
-    this.timeout = options.timeout || 30000;
-    this.maxRetries = options.maxRetries || 3;
-    this.baseURL = options.baseURL || 'https://graph.zalo.me/v2.0';
+    this.secretKey = options.secretKey
+      || process.env.ZALO_BOT_SECRET
+      || process.env.BOT_SECRET
+      || null;
+
+    this.timeout = parseInt(options.timeout || process.env.ZALO_BOT_TIMEOUT, 10) || 30000;
+    this.maxRetries = parseInt(options.maxRetries || process.env.ZALO_BOT_MAX_RETRIES, 10) || 3;
+
+    // Validate required fields
+    this._validate();
   }
 
   /**
-   * Validate configuration options
+   * Validate configuration values
+   * @throws {Error} If required configuration is missing or invalid
    * @private
    */
-  _validate(options) {
-    if (!options || typeof options !== 'object') {
-      throw new Error('Configuration must be an object');
+  _validate() {
+    if (!this.botToken) {
+      throw new Error(
+        'botToken is required. Create a bot at https://bot.zapps.me/ ' +
+        'then set ZALO_BOT_TOKEN environment variable or pass botToken option.'
+      );
     }
-
-    if (!options.accessToken || typeof options.accessToken !== 'string') {
-      throw new Error('accessToken is required and must be a string');
+    if (typeof this.botToken !== 'string') {
+      throw new Error('botToken must be a string');
     }
-
-    if (options.accessToken.trim().length === 0) {
-      throw new Error('accessToken cannot be empty');
+    if (this.botToken.length === 0) {
+      throw new Error('botToken cannot be empty');
     }
-
-    if (options.secretKey && typeof options.secretKey !== 'string') {
-      throw new Error('secretKey must be a string');
+    if (this.timeout < 0) {
+      throw new Error('timeout must be non-negative');
     }
-
-    if (options.timeout && typeof options.timeout !== 'number') {
-      throw new Error('timeout must be a number');
-    }
-
-    if (options.maxRetries && typeof options.maxRetries !== 'number') {
-      throw new Error('maxRetries must be a number');
+    if (this.maxRetries < 0) {
+      throw new Error('maxRetries must be non-negative');
     }
   }
 
   /**
    * Get configuration as plain object
-   * @returns {Object}
+   * @returns {Object} Configuration object
    */
   toObject() {
     return {
-      accessToken: this.accessToken,
+      botToken: this.botToken,
       secretKey: this.secretKey,
       timeout: this.timeout,
       maxRetries: this.maxRetries,
-      baseURL: this.baseURL,
     };
   }
 
   /**
-   * Create config from environment variables
-   * @returns {ZaloConfig}
+   * Get the API base URL for the configured bot
+   * @returns {string} API base URL
    */
-  static fromEnv() {
-    return new ZaloConfig({
-      accessToken: process.env.ZALO_ACCESS_TOKEN,
-      secretKey: process.env.ZALO_SECRET_KEY,
-      timeout: parseInt(process.env.ZALO_TIMEOUT, 10) || 30000,
-      maxRetries: parseInt(process.env.ZALO_MAX_RETRIES, 10) || 3,
-      baseURL: process.env.ZALO_BASE_URL || 'https://graph.zalo.me/v2.0',
-    });
+  getApiBaseUrl() {
+    return `https://bot-api.zaloplatforms.com/bot${this.botToken}`;
+  }
+
+  /**
+   * Check if webhook secret is configured
+   * @returns {boolean} True if secret key is set
+   */
+  hasSecretKey() {
+    return this.secretKey && this.secretKey.length >= 8;
   }
 }
 

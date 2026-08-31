@@ -6,9 +6,8 @@
 
 /**
  * Unit tests for MessageModule
- * Tests: sendText, sendImage, sendFile, sendSticker, sendTemplate, sendQuickReply
- * Uses mock server to simulate Zalo API responses
- * @module tests/modules/message.test
+ * Tests: sendMessage, sendPhoto, sendSticker, sendVoice, sendChatAction
+ * @module tests/modules/message
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
@@ -19,26 +18,22 @@ const MessageModule = require('../../src/modules/message');
 const { startMockServer, stopMockServer } = require('../helpers/mock-server');
 
 describe('MessageModule', () => {
-  let messageModule;
   let mockServer;
+  let mockBaseUrl;
+  let client;
+  let messageModule;
 
-  /**
-   * Set up mock server and MessageModule before each test
-   */
   beforeEach(async () => {
-    const mock = await startMockServer({ accessToken: 'test-token' });
+    const mock = await startMockServer();
     mockServer = mock.server;
-
-    const client = new ZaloClient({
-      accessToken: 'test-token',
-      baseURL: mock.baseUrl,
+    mockBaseUrl = mock.baseUrl;
+    client = new ZaloClient({
+      botToken: 'test-token',
+      baseURL: mockBaseUrl,
     });
     messageModule = new MessageModule(client);
   });
 
-  /**
-   * Tear down mock server after each test
-   */
   afterEach(async () => {
     await stopMockServer(mockServer);
   });
@@ -46,229 +41,200 @@ describe('MessageModule', () => {
   // ── sendText ──────────────────────────────────────
 
   describe('sendText()', () => {
-    /**
-     * Test: sendText returns message_id on success
-     */
-    it('should send text message and return message_id', async () => {
-      const result = await messageModule.sendText('user_123', 'Hello World');
-      assert.ok(result.message_id);
-      assert.ok(result.message_id.startsWith('msg_mock_'));
+    it('should send text message successfully', async () => {
+      const result = await messageModule.sendText('user_chat_id', 'Hello!');
+      assert.equal(result.ok, true);
+      assert.ok(result.result.message_id);
+      assert.ok(result.result.date);
     });
 
-    /**
-     * Test: sendText throws when userId is missing
-     */
-    it('should throw when userId is missing', async () => {
+    it('should throw when chatId is missing', async () => {
       await assert.rejects(
         () => messageModule.sendText(null, 'Hello'),
-        /userId is required/
+        /chatId is required/
       );
     });
 
-    /**
-     * Test: sendText throws when text is empty
-     */
-    it('should throw when text is empty', async () => {
+    it('should throw when text is missing', async () => {
       await assert.rejects(
-        () => messageModule.sendText('user_123', ''),
+        () => messageModule.sendText('user123', null),
         /text is required/
       );
     });
 
-    /**
-     * Test: sendText throws when text exceeds 1000 characters
-     */
-    it('should throw when text exceeds 1000 characters', async () => {
-      const longText = 'a'.repeat(1001);
+    it('should throw when text is empty', async () => {
       await assert.rejects(
-        () => messageModule.sendText('user_123', longText),
-        /exceeds 1000 character limit/
+        () => messageModule.sendText('user123', ''),
+        /text is required/
       );
     });
 
-    /**
-     * Test: sendText accepts text exactly 1000 characters
-     */
-    it('should accept text of exactly 1000 characters', async () => {
-      const exactText = 'a'.repeat(1000);
-      const result = await messageModule.sendText('user_123', exactText);
-      assert.ok(result.message_id);
+    it('should throw when text exceeds 2000 chars', async () => {
+      const longText = 'a'.repeat(2001);
+      await assert.rejects(
+        () => messageModule.sendText('user123', longText),
+        /between 1 and 2000/
+      );
+    });
+
+    it('should send with caption option', async () => {
+      const result = await messageModule.sendText('user123', 'Test', { caption: 'Caption text' });
+      assert.equal(result.ok, true);
     });
   });
 
-  // ── sendImage ─────────────────────────────────────
+  // ── sendPhoto ─────────────────────────────────────
 
-  describe('sendImage()', () => {
-    /**
-     * Test: sendImage sends with valid attachmentId
-     */
-    it('should send image with valid attachmentId', async () => {
-      const result = await messageModule.sendImage('user_123', 'img_abc123');
-      assert.ok(result.message_id);
+  describe('sendPhoto()', () => {
+    it('should send photo message successfully', async () => {
+      const result = await messageModule.sendPhoto('user123', 'https://example.com/photo.jpg');
+      assert.equal(result.ok, true);
+      assert.ok(result.result.message_id);
     });
 
-    /**
-     * Test: sendImage throws when attachmentId is missing
-     */
-    it('should throw when attachmentId is missing', async () => {
+    it('should throw when chatId is missing', async () => {
       await assert.rejects(
-        () => messageModule.sendImage('user_123', null),
-        /attachmentId is required/
+        () => messageModule.sendPhoto(null, 'https://example.com/photo.jpg'),
+        /chatId is required/
       );
     });
-  });
 
-  // ── sendFile ──────────────────────────────────────
-
-  describe('sendFile()', () => {
-    /**
-     * Test: sendFile sends with valid attachmentId
-     */
-    it('should send file with valid attachmentId', async () => {
-      const result = await messageModule.sendFile('user_123', 'file_abc123');
-      assert.ok(result.message_id);
+    it('should throw when photo URL is missing', async () => {
+      await assert.rejects(
+        () => messageModule.sendPhoto('user123', null),
+        /photo URL is required/
+      );
     });
 
-    /**
-     * Test: sendFile throws when attachmentId is missing
-     */
-    it('should throw when attachmentId is missing', async () => {
-      await assert.rejects(
-        () => messageModule.sendFile('user_123', undefined),
-        /attachmentId is required/
-      );
+    it('should send with caption option', async () => {
+      const result = await messageModule.sendPhoto('user123', 'https://example.com/photo.jpg', {
+        caption: 'Beautiful photo!',
+      });
+      assert.equal(result.ok, true);
     });
   });
 
   // ── sendSticker ───────────────────────────────────
 
   describe('sendSticker()', () => {
-    /**
-     * Test: sendSticker sends with valid stickerId
-     */
-    it('should send sticker with valid stickerId', async () => {
-      const result = await messageModule.sendSticker('user_123', 'sticker_001');
-      assert.ok(result.message_id);
+    it('should send sticker successfully', async () => {
+      const result = await messageModule.sendSticker('user123', 'sticker-abc');
+      assert.equal(result.ok, true);
+      assert.ok(result.result.message_id);
     });
 
-    /**
-     * Test: sendSticker throws when stickerId is missing
-     */
-    it('should throw when stickerId is missing', async () => {
+    it('should throw when sticker is missing', async () => {
       await assert.rejects(
-        () => messageModule.sendSticker('user_123', ''),
-        /stickerId is required/
+        () => messageModule.sendSticker('user123', null),
+        /sticker ID is required/
       );
     });
   });
 
-  // ── sendTemplate ──────────────────────────────────
+  // ── sendVoice ─────────────────────────────────────
 
-  describe('sendTemplate()', () => {
-    /**
-     * Test: sendTemplate sends button template
-     */
-    it('should send button template', async () => {
-      const result = await messageModule.sendTemplate('user_123', {
-        type: 'button',
-        elements: [
-          { title: 'Yes', payload: 'yes' },
-          { title: 'No', payload: 'no' },
-        ],
-      });
-      assert.ok(result.message_id);
+  describe('sendVoice()', () => {
+    it('should send voice message successfully', async () => {
+      const result = await messageModule.sendVoice('user123', 'https://example.com/voice.aac');
+      assert.equal(result.ok, true);
+      assert.ok(result.result.message_id);
     });
 
-    /**
-     * Test: sendTemplate throws with invalid type
-     */
-    it('should throw when template.type is invalid', async () => {
+    it('should throw when voice URL is missing', async () => {
       await assert.rejects(
-        () => messageModule.sendTemplate('user_123', {
-          type: 'invalid',
-          elements: [{ title: 'A' }],
-        }),
-        /template.type must be/
-      );
-    });
-
-    /**
-     * Test: sendTemplate throws when elements is empty
-     */
-    it('should throw when template.elements is empty', async () => {
-      await assert.rejects(
-        () => messageModule.sendTemplate('user_123', {
-          type: 'button',
-          elements: [],
-        }),
-        /non-empty array/
+        () => messageModule.sendVoice('user123', null),
+        /voiceUrl is required/
       );
     });
   });
 
-  // ── sendQuickReply ────────────────────────────────
+  // ── sendChatAction ────────────────────────────────
 
-  describe('sendQuickReply()', () => {
-    /**
-     * Test: sendQuickReply sends with valid replies
-     */
-    it('should send quick reply with valid options', async () => {
-      const result = await messageModule.sendQuickReply(
-        'user_123',
-        'Pick an option:',
-        [
-          { title: 'A', payload: 'a' },
-          { title: 'B', payload: 'b' },
-        ]
-      );
-      assert.ok(result.message_id);
+  describe('sendChatAction()', () => {
+    it('should send chat action successfully', async () => {
+      const result = await messageModule.sendChatAction('user123', 'typing');
+      assert.equal(result.ok, true);
     });
 
-    /**
-     * Test: sendQuickReply throws with empty array
-     */
-    it('should throw when quickReplies is empty', async () => {
+    it('should throw when action is missing', async () => {
       await assert.rejects(
-        () => messageModule.sendQuickReply('user_123', 'Choose:', []),
-        /non-empty array/
-      );
-    });
-
-    /**
-     * Test: sendQuickReply throws when exceeding 13 replies
-     */
-    it('should throw when quickReplies exceeds 13 items', async () => {
-      const tooMany = Array.from({ length: 14 }, (_, i) => ({
-        title: `Opt ${i}`,
-        payload: `opt${i}`,
-      }));
-      await assert.rejects(
-        () => messageModule.sendQuickReply('user_123', 'Choose:', tooMany),
-        /Maximum 13 quick replies/
+        () => messageModule.sendChatAction('user123', null),
+        /action is required/
       );
     });
   });
 
-  // ── getMessage ────────────────────────────────────
+  // ── getMe ─────────────────────────────────────────
 
-  describe('getMessage()', () => {
-    /**
-     * Test: getMessage retrieves message details
-     */
-    it('should retrieve message by ID', async () => {
-      const result = await messageModule.getMessage('msg_abc');
-      assert.equal(result.message_id, 'msg_abc');
-      assert.equal(result.status, 'delivered');
+  describe('getMe()', () => {
+    it('should return bot info', async () => {
+      const result = await messageModule.getMe();
+      assert.equal(result.ok, true);
+      assert.ok(result.result.id);
+      assert.ok(result.result.account_name);
+    });
+  });
+
+  // ── getUpdates ────────────────────────────────────
+
+  describe('getUpdates()', () => {
+    it('should return empty updates array', async () => {
+      const result = await messageModule.getUpdates();
+      assert.equal(result.ok, true);
+      assert.ok(Array.isArray(result.result));
+    });
+  });
+
+  // ── setWebhook ────────────────────────────────────
+
+  describe('setWebhook()', () => {
+    it('should set webhook successfully', async () => {
+      const result = await messageModule.setWebhook('https://example.com/webhook', 'my-secret-123');
+      assert.equal(result.ok, true);
+      assert.equal(result.result.url, 'https://example.com/webhook');
     });
 
-    /**
-     * Test: getMessage throws when messageId is missing
-     */
-    it('should throw when messageId is missing', async () => {
+    it('should throw when URL is missing', async () => {
       await assert.rejects(
-        () => messageModule.getMessage(null),
-        /messageId is required/
+        () => messageModule.setWebhook(null, 'secret'),
+        /url is required/
       );
+    });
+
+    it('should throw when secretToken is too short', async () => {
+      await assert.rejects(
+        () => messageModule.setWebhook('https://example.com/webhook', 'short'),
+        /8-256 characters/
+      );
+    });
+  });
+
+  // ── testWebhook ───────────────────────────────────
+
+  describe('testWebhook()', () => {
+    it('should test webhook successfully', async () => {
+      const result = await messageModule.testWebhook();
+      assert.equal(result.ok, true);
+      assert.equal(result.result.ok, true);
+    });
+  });
+
+  // ── deleteWebhook ─────────────────────────────────
+
+  describe('deleteWebhook()', () => {
+    it('should delete webhook successfully', async () => {
+      const result = await messageModule.deleteWebhook();
+      assert.equal(result.ok, true);
+    });
+  });
+
+  // ── getWebhookInfo ────────────────────────────────
+
+  describe('getWebhookInfo()', () => {
+    it('should get webhook info', async () => {
+      const result = await messageModule.getWebhookInfo();
+      assert.equal(result.ok, true);
+      assert.ok('url' in result.result);
     });
   });
 });

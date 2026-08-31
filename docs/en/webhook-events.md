@@ -6,8 +6,8 @@ This document covers webhook setup, signature verification, and how to handle in
 
 ## Setting Up a Webhook
 
-1. Go to [Zalo Developer Platform](https://developers.zalo.me/)
-2. Select your OA (Official Account)
+1. Go to [Zalo Bot Platform](https://bot.zapps.me/)
+2. Select your bot
 3. Navigate to **"Webhook"** in the sidebar
 4. Enter your webhook URL (must be HTTPS)
 5. Copy the **Secret Key** — you'll need it to verify signatures
@@ -18,7 +18,7 @@ This document covers webhook setup, signature verification, and how to handle in
 
 ## Signature Verification
 
-Zalo sends an HMAC-SHA256 signature in the `X-Zalo-Signature` header. The SDK handles verification automatically when you use the built-in middleware.
+Zalo Bot sends the secret token in the `X-Bot-Api-Secret-Token` header. The SDK handles verification automatically when you use the built-in middleware.
 
 ```javascript
 const express = require('express');
@@ -194,7 +194,7 @@ app.post('/webhook', bot.webhook.middleware({
 
 | Issue | Solution |
 |-------|----------|
-| `401 Invalid signature` | Check that `secretKey` matches the one in Zalo Developer Platform |
+| `401 Invalid signature` | Check that `secretKey` matches the one in Zalo Bot Platform |
 | `Webhook URL not reachable` | Ensure your server is public and uses HTTPS |
 | `Timeout` | Respond with 200 OK immediately, process asynchronously |
 | `Duplicate events` | Zalo may send duplicates — make your handlers idempotent |

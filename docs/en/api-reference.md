@@ -1,241 +1,417 @@
-# API Reference
+#!/usr/bin/env python3
+"""
+Reference doc generator for Zalo Bot Platform API
+Based on https://bot.zapps.me/docs/
+Output: /var/tools/zalobot/sdk/docs/en/api-reference.md (EN) and /var/tools/zalobot/sdk/docs/vi/api-reference.md (VI)
+"""
 
-This document provides detailed information about all API endpoints available in the Zalo Bot SDK.
+import re
+
+API_REFERENCE_MD_EN = """# API Reference
+
+Complete API reference for the Zalo Bot SDK.
+
+> **Zalo Bot API Base URL:** `https://bot-api.zaloplatforms.com/bot{BOT_TOKEN}/{method}`
+> **Authentication:** Bot Token embedded in URL path (not in headers)
+> **Reference:** https://bot.zapps.me/docs/
 
 ---
 
-## Message Module
+## Table of Contents
 
-### `sendText(userId, text, options)`
+- [Authentication](#authentication)
+- [Response Format](#response-format)
+- [Bot APIs](#bot-apis)
+  - [getMe](#getme)
+  - [getUpdates](#getupdates)
+  - [setWebhook](#setwebhook)
+  - [testWebhook](#testwebhook)
+  - [deleteWebhook](#deletewebhook)
+  - [getWebhookInfo](#getwebhookinfo)
+- [Message APIs](#message-apis)
+  - [sendMessage](#sendmessage)
+  - [sendPhoto](#sendphoto)
+  - [sendSticker](#sendsticker)
+  - [sendVoice](#sendvoice)
+  - [sendChatAction](#sendchataction)
+- [Webhook Events](#webhook-events)
 
-Send a plain text message to a user.
+---
 
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `userId` | `string` | Recipient user ID |
-| `text` | `string` | Message content (max 1000 characters) |
-| `options.quoteMessageId` | `string` | (Optional) Message ID to reply to |
-| `options.force` | `boolean` | (Optional) Force send even if user hasn't interacted in 24h |
+## Authentication
+
+Zalo Bot uses **Bot Token** authentication. The token is embedded in the API URL:
+
+```
+https://bot-api.zaloplatforms.com/bot{BOT_TOKEN}/{method}
+```
 
 **Example:**
-```javascript
-await bot.message.sendText('123456789', 'Hello, world!');
 ```
+https://bot-api.zaloplatforms.com/bot123456789:abc-xyz/sendMessage
+```
+
+**Bot Token:**
+- Format: `123456789:abc-xyz`
+- Obtained after creating a bot via Zalo Bot Creator
+- Does not expire until manually reset
+- Reset: Open Zalo Bot Creator → Settings → Reset Token
+
+---
+
+## Response Format
+
+All Zalo Bot API responses return JSON in this format:
+
+```json
+{
+  "ok": true,
+  "result": { ... }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ok` | boolean | `true` if the request succeeded |
+| `result` | object | Data returned by the API |
+| `error_code` | number | Error code (only present when `ok` is false) |
+| `description` | string | Error description (only present when `ok` is false) |
+
+---
+
+## Bot APIs
+
+### getMe
+
+Get bot information. Validates the bot token.
+
+**URL:** `GET /getMe`
+
+**Parameters:** None
 
 **Response:**
 ```json
-{ "message_id": "msg_xyz123", "timestamp": 1623456789 }
+{
+  "ok": true,
+  "result": {
+    "id": "1459232241454765289",
+    "account_name": "bot.VDKyGxQvc",
+    "account_type": "BASIC",
+    "can_join_groups": false
+  }
+}
+```
+
+**SDK:**
+```javascript
+const info = await bot.message.getMe();
+console.log(info.result.id);
 ```
 
 ---
 
-### `sendImage(userId, attachmentId, options)`
+### getUpdates
+
+Long-polling: receive updates when no webhook is configured.
+**Not available** if webhook is set (use `deleteWebhook` first).
+
+**URL:** `GET /getUpdates`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| timeout | number | No | Timeout in seconds (default: 30) |
+
+**Response:** Same as webhook payload format.
+
+**SDK:**
+```javascript
+const updates = await bot.message.getUpdates({ timeout: 30 });
+```
+
+---
+
+### setWebhook
+
+Configure webhook URL to receive events from Zalo.
+
+**URL:** `POST /setWebhook`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| url | string | Yes | HTTPS webhook URL (must be publicly accessible) |
+| secretToken | string | Yes | Secret token (8-256 chars), sent in `X-Bot-Api-Secret-Token` header |
+
+**Response:**
+```json
+{
+  "ok": true,
+  "result": {
+    "url": "https://your-webhook.com",
+    "updated_at": 1749538250568,
+    "verification": {
+      "ok": true,
+      "status_code": 200,
+      "outcome": "webhook.ok",
+      "latency_ms": 214,
+      "hint": "Your endpoint responded successfully."
+    }
+  }
+}
+```
+
+**SDK:**
+```javascript
+await bot.message.setWebhook('https://your-domain.com/webhook', 'your-secret-token');
+```
+
+---
+
+### testWebhook
+
+Test the current webhook URL to check connectivity.
+
+**URL:** `POST /testWebhook`
+
+**Parameters:** None
+
+**Response:**
+```json
+{
+  "ok": true,
+  "result": {
+    "ok": true,
+    "url": "https://your-webhook.com",
+    "status_code": 200,
+    "outcome": "webhook.ok",
+    "latency_ms": 214,
+    "hint": "Your endpoint responded successfully."
+  }
+}
+```
+
+| outcome | Description |
+|---------|-------------|
+| `webhook.ok` | Success (2xx response) |
+| `webhook.http.403` | Blocked by WAF/CDN |
+| `webhook.http.404` | Endpoint not found |
+| `webhook.http.5xx` | Server error |
+| `webhook.err.tls` | TLS certificate error |
+| `webhook.err.dns` | DNS resolution failed |
+| `webhook.err.timeout` | Request timeout |
+| `webhook.err.blocked` | URL points to localhost/internal IP |
+
+**SDK:**
+```javascript
+const result = await bot.message.testWebhook();
+console.log(result.result.hint);
+```
+
+---
+
+### deleteWebhook
+
+Remove webhook configuration (switch back to long polling).
+
+**URL:** `POST /deleteWebhook`
+
+**Parameters:** None
+
+**SDK:**
+```javascript
+await bot.message.deleteWebhook();
+```
+
+---
+
+### getWebhookInfo
+
+Get current webhook configuration status.
+
+**URL:** `GET /getWebhookInfo`
+
+**Parameters:** None
+
+**SDK:**
+```javascript
+const info = await bot.message.getWebhookInfo();
+console.log(info.result.url);
+```
+
+---
+
+## Message APIs
+
+### sendMessage
+
+Send a text message.
+
+**URL:** `POST /sendMessage`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| chat_id | string | Yes | User or chat ID |
+| text | string | Yes | Message text (1-2000 chars) |
+| text_styles | array | No | Rich text style runs |
+
+**Rich Text (text_styles):**
+
+| Code | Style |
+|------|-------|
+| `b` | Bold |
+| `i` | Italic |
+| `u` | Underline |
+| `s` | Strikethrough |
+| `c_050a19` | Default color |
+| `c_15a85f` | Green |
+| `c_db342e` | Red |
+| `c_f27806` | Orange |
+| `c_f7b503` | Yellow |
+
+**SDK:**
+```javascript
+await bot.message.sendText('chat_id', 'Hello from Bot!');
+```
+
+---
+
+### sendPhoto
 
 Send an image message.
 
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `userId` | `string` | Recipient user ID |
-| `attachmentId` | `string` | ID from `media.uploadImage()` |
-| `options.caption` | `string` | (Optional) Image caption (max 1000 chars) |
-| `options.quoteMessageId` | `string` | (Optional) Message ID to reply to |
+**URL:** `POST /sendPhoto`
 
-**Example:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| chat_id | string | Yes | User or chat ID |
+| photo | string | Yes | Image URL |
+| caption | string | No | Image caption (1-2000 chars) |
+
+**SDK:**
 ```javascript
-const upload = await bot.media.uploadImage('./photo.jpg');
-await bot.message.sendImage('123456789', upload.attachment_id, {
+await bot.message.sendPhoto('chat_id', 'https://example.com/photo.jpg', {
   caption: 'Check this out!'
 });
 ```
 
 ---
 
-### `sendFile(userId, attachmentId, options)`
+### sendSticker
 
-Send a file message.
+Send a sticker.
 
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `userId` | `string` | Recipient user ID |
-| `attachmentId` | `string` | ID from `media.uploadFile()` |
-| `options.caption` | `string` | (Optional) File caption (max 1000 chars) |
-| `options.quoteMessageId` | `string` | (Optional) Message ID to reply to |
+**URL:** `POST /sendSticker`
 
----
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| chat_id | string | Yes | User or chat ID |
+| sticker | string | Yes | Sticker ID from stickers.zaloapp.com |
 
-### `sendSticker(userId, stickerId, options)`
-
-Send a sticker message.
-
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `userId` | `string` | Recipient user ID |
-| `stickerId` | `string` | Sticker ID from Zalo sticker library |
-| `options.quoteMessageId` | `string` | (Optional) Message ID to reply to |
-
----
-
-### `sendTemplate(userId, template, options)`
-
-Send a template message (buttons or list).
-
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `userId` | `string` | Recipient user ID |
-| `template.type` | `string` | `'button'` or `'list'` |
-| `template.elements` | `Array` | Array of button/list elements |
-| `options.quoteMessageId` | `string` | (Optional) Message ID to reply to |
-
-**Example:**
+**SDK:**
 ```javascript
-await bot.message.sendTemplate('123456789', {
-  type: 'button',
-  elements: [
-    { title: 'Yes', payload: 'yes' },
-    { title: 'No', payload: 'no' }
-  ]
-});
+await bot.message.sendSticker('chat_id', 'sticker-id-here');
 ```
 
 ---
 
-### `sendQuickReply(userId, text, quickReplies, options)`
+### sendVoice
 
-Send a text message with quick reply buttons.
+Send a voice message (1-1 chat only).
 
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `userId` | `string` | Recipient user ID |
-| `text` | `string` | Message text |
-| `quickReplies` | `Array` | Array of `{ title, payload, image_url? }` |
-| `options.quoteMessageId` | `string` | (Optional) Message ID to reply to |
+**URL:** `POST /sendVoice`
 
-**Example:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| chat_id | string | Yes | User ID (1-1 only, not groups) |
+| voice_url | string | Yes | URL to .aac audio file |
+
+**SDK:**
 ```javascript
-await bot.message.sendQuickReply('123456789', 'Choose an option:', [
-  { title: 'Option A', payload: 'a' },
-  { title: 'Option B', payload: 'b' }
-]);
+await bot.message.sendVoice('user_id', 'https://example.com/voice.aac');
 ```
 
 ---
 
-### `getMessage(messageId)`
+### sendChatAction
 
-Retrieve a specific message by ID.
+Show typing indicator.
 
----
+**URL:** `POST /sendChatAction`
 
-### `getConversation(params)`
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| chat_id | string | Yes | User or chat ID |
+| action | string | Yes | `typing` or `upload_photo` |
 
-Get conversation history.
-
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `params.userId` | `string` | (Optional) Filter by user ID |
-| `params.limit` | `number` | (Optional) Number of messages (default 50, max 200) |
-| `params.cursor` | `string` | (Optional) Pagination cursor |
-
----
-
-## User Module
-
-### `getProfile(userId, options)`
-
-Get user profile information.
-
-**Example:**
+**SDK:**
 ```javascript
-const user = await bot.user.getProfile('123456789');
-console.log(user.name, user.avatar);
+await bot.message.sendChatAction('chat_id', 'typing');
 ```
 
 ---
 
-### `getFollowers(params)`
+## Webhook Events
 
-Get list of followers.
+When a user interacts with your bot, Zalo sends a POST request to your webhook URL.
 
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `params.limit` | `number` | (Optional) Number of followers (default 50, max 200) |
-| `params.cursor` | `string` | (Optional) Pagination cursor |
+**Headers:**
+```
+X-Bot-Api-Secret-Token: your-secret-token
+Content-Type: application/json
+```
 
----
+**Payload format:**
+```json
+{
+  "ok": true,
+  "result": {
+    "event_name": "message.text.received",
+    "message": {
+      "from": {
+        "id": "user_id",
+        "display_name": "User Name",
+        "is_bot": false
+      },
+      "chat": {
+        "id": "chat_id",
+        "chat_type": "PRIVATE"
+      },
+      "text": "Hello!",
+      "message_id": "abc123",
+      "date": 1750316131602
+    }
+  }
+}
+```
 
-### `isFollowing(userId)`
+### Event Types
 
-Check if a user follows the OA.
+| event_name | Description | Message fields |
+|------------|-------------|----------------|
+| `message.text.received` | Text message | `text` |
+| `message.image.received` | Image message | `photo`, `caption` |
+| `message.sticker.received` | Sticker | `sticker` |
+| `message.voice.received` | Voice message | `voice_url` |
+| `message.unsupported.received` | Unsupported message | — |
 
-**Returns:** `boolean`
+### SDK Event Names (normalized)
 
----
+The SDK normalizes event names:
 
-## Webhook Module
+| Zalo Bot event_name | SDK event |
+|---------------------|-----------|
+| `message.text.received` | `user_text` |
+| `message.image.received` | `user_image` |
+| `message.sticker.received` | `user_sticker` |
+| `message.voice.received` | `user_voice` |
 
-### `verifySignature(signature, rawBody)`
+### Important Notes
 
-Verify webhook HMAC signature.
+- Return HTTP 200 within 5 seconds — process logic asynchronously
+- Verify `X-Bot-Api-Secret-Token` header before processing
+- Webhook URL must be HTTPS and publicly accessible
+"""
 
-**Returns:** `boolean`
-
----
-
-### `parseEvent(payload)`
-
-Parse incoming webhook payload into a normalized event object.
-
----
-
-### `middleware(options)`
-
-Express.js middleware for webhook handling.
-
-**Options:**
-| Option | Type | Description |
-|--------|------|-------------|
-| `secretKey` | `string` | Override secret key |
-| `verifySignature` | `boolean` | Enable signature verification (default: true) |
-| `onEvent` | `Function` | Async event handler |
-
----
-
-## Media Module
-
-### `uploadImage(file, options)`
-
-Upload an image file.
-
-**Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `file` | `string` or `Buffer` | File path or Buffer |
-| `options.filename` | `string` | (Optional) Custom filename |
-
-**Returns:** `{ attachment_id: string, ... }`
-
----
-
-### `uploadFile(file, options)`
-
-Upload a file.
-
----
-
-### `getMediaUrl(attachmentId, options)`
-
-Get media URL by attachment ID.
-
----
-
-### `downloadMedia(attachmentId, savePath)`
-
-Download a media file to a local path.
+if __name__ == "__main__":
+    with open("/var/tools/zalobot/sdk/docs/en/api-reference.md", "w", encoding="utf-8") as f:
+        f.write(API_REFERENCE_MD_EN)
+    print("✅ docs/en/api-reference.md written")
