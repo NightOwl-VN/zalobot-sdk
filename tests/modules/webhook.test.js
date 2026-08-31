@@ -257,7 +257,7 @@ describe('WebhookModule', () => {
       };
 
       const middleware = webhookModule.middleware({
-        async onEvent(event) {},
+        async onEvent() {},
       });
 
       let statusCode = 0;

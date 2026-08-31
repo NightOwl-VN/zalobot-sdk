@@ -113,7 +113,7 @@ describe('ZaloConfig', () => {
 });
 
 describe('ZaloClient', () => {
-  let mockServer;
+  // let mockServer;
   let mockBaseUrl;
 
   /** 
@@ -162,7 +162,7 @@ describe('ZaloClient', () => {
 
     // Since we can't actually connect to mock server in this unit test,
     // just verify the client is configured correctly
-    const data = await client.get('/getMe');
+    await client.get('/getMe');
     assert.equal(client.baseURL, mockBaseUrl);
   });
 
@@ -175,7 +175,7 @@ describe('ZaloClient', () => {
       baseURL: mockBaseUrl,
     });
 
-    const data = await client.post('/sendMessage', {
+    await client.post('/sendMessage', {
       chat_id: 'test_user',
       text: 'Hello',
     });

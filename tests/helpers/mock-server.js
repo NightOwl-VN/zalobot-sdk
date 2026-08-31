@@ -51,7 +51,7 @@ function createMockServer() {
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', () => {
       let parsed = {};
-      try { parsed = body ? JSON.parse(body) : {}; } catch {}
+      try { parsed = body ? JSON.parse(body) : {}; } catch { return; }
 
       const url = (req.url || '').split('?')[0];
       const query = (req.url || '').split('?')[1] || '';

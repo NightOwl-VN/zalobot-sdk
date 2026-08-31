@@ -31,34 +31,39 @@ const bot = new ZaloBot({
 
 // Simple webhook handler using middleware
 app.post('/webhook', bot.webhook.middleware({
-  async onEvent(event, req) {
+  async onEvent(event) {
     console.log(`[${new Date().toISOString()}] Event: ${event.event} from ${event.userId}`);
 
     // Handle different event types
     switch (event.event) {
-      case 'user_text':
+      case 'user_text': {
         const text = event.message?.text || '';
         await handleTextMessage(event.chatId, text);
         break;
+      }
 
-      case 'user_quick_reply':
+      case 'user_quick_reply': {
         const payload = event.message?.quickReply?.payload || '';
         await handleQuickReply(event.chatId, payload);
         break;
+      }
 
-      case 'user_follow':
+      case 'user_follow': {
         await bot.message.sendText(
           event.chatId,
           'Thanks for following! 🎉\nSend any message and I will reply!'
         );
         break;
+      }
 
-      case 'user_unfollow':
+      case 'user_unfollow': {
         console.log(`User ${event.userId} unfollowed`);
         break;
+      }
 
-      default:
+      default: {
         console.log(`Unhandled event: ${event.event}`);
+      }
     }
   }
 }));
