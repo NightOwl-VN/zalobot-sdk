@@ -309,11 +309,10 @@ describe('UserModule', () => {
       await userModule.getProfileCached('expiry_user');
 
       // Manually age the cache entry past the TTL (5 minutes = 300000ms)
-      const cacheKey = 'user:expiry_user';
+      // Find the actual cache key (format: user:{userId}:{fields})
+      const cacheKey = Array.from(userModule._cache.keys()).find(k => k.startsWith('user:expiry_user:'));
+      assert.ok(cacheKey, 'cache entry should exist for expiry_user');
       const entry = userModule._cache.get(cacheKey);
-      // Cache entry should exist before second call (may be evicted by TTL cleanup)
-      const cacheHasEntry = userModule._cache.has('user:expiry_user');
-      assert.ok(cacheHasEntry || requests.length > 0, 'cache entry exists or re-fetch was triggered');
       entry.timestamp = Date.now() - 300001; // Set timestamp 5 min + 1ms ago
 
       // Next call should re-fetch from server
@@ -333,13 +332,14 @@ describe('UserModule', () => {
     it('should clear cache for a specific user ID', async () => {
       // Populate cache
       await userModule.getProfileCached('user_x');
-      // After clearing specific user, check cache is reduced but may still have other entries
-    const remainingKeys = Array.from(userModule._cache.keys()).filter(k => k !== 'user:user_x');
-    assert.ok(remainingKeys.length >= 0, 'cache clearing completed');
+      // Verify cache has an entry for user_x before clearing
+      const hasBeforeClear = Array.from(userModule._cache.keys()).some(k => k.startsWith('user:user_x:'));
+      assert.ok(hasBeforeClear, 'cache should have entry for user_x before clearing');
 
       // Clear specific entry
       userModule.clearCache('user_x');
-      assert.ok(!userModule._cache.has('user:user_x'));
+      const hasAfterClear = Array.from(userModule._cache.keys()).some(k => k.startsWith('user:user_x:'));
+      assert.ok(!hasAfterClear, 'cache should not have entry for user_x after clearing');
     });
 
     it('should clear all cache entries when no userId is provided', async () => {
@@ -379,10 +379,11 @@ describe('UserModule', () => {
       // Clear only one
       userModule.clearCache('remove_user');
 
-      // After clearing user_x, keep_user should still be in cache if it was never cleared
-    const hasKeepUser = userModule._cache.has('user:keep_user');
-    assert.ok(hasKeepUser, 'other users cache preserved');
-      assert.ok(!userModule._cache.has('user:remove_user'));
+      // After clearing remove_user, keep_user should still be in cache
+      const hasKeepUser = Array.from(userModule._cache.keys()).some(k => k.startsWith('user:keep_user:'));
+      assert.ok(hasKeepUser, 'other users cache preserved');
+      const hasRemoveUser = Array.from(userModule._cache.keys()).some(k => k.startsWith('user:remove_user:'));
+      assert.ok(!hasRemoveUser, 'removed user should not be in cache');
     });
 
     it('should be safe to call on a module with no cache initialized', async () => {

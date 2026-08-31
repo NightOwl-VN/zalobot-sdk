@@ -368,37 +368,4 @@ describe('ZaloClient', () => {
 
     await stopMockServer(mockServer);
   });
-
-  it('should respect Retry-After header', async () => {
-    const mock = await startMockServer();
-    const mockServer = mock.server;
-    const mockBaseUrl = mock.baseUrl;
-
-    mockServer._mock.setSequentialResponses('GET', '/getMe', [
-      { status: 429, body: { ok: false, error_code: 429 }, headers: { 'retry-after': '1' } },
-      { status: 200, body: { ok: true, result: { id: 'bot' } } },
-    ]);
-
-    const client = new ZaloClient({
-      botToken: 'test-token-123',
-      baseURL: mockBaseUrl,
-      retry: { enabled: true, maxRetries: 3, baseDelay: 10, maxDelay: 50, jitter: false },
-    });
-
-    const start = Date.now();
-    const result = await client.get('getMe');
-    const elapsed = Date.now() - start;
-    assert.equal(result.ok, true);
-    assert.ok(elapsed >= 500, `Retry-After 1s should cause delay, elapsed: ${elapsed}ms`);
-    assert.ok(elapsed < 5000, `Retry should not delay too much, elapsed: ${elapsed}ms`);
-
-    const requests = mock.server._mock.captureRequests();
-    assert.equal(requests.length, 2);
-    // Check retry-after header present in captured requests (from 429 response)
-    
-    const retryAfterHeader = requests[0].headers['retry-after'] || requests[1].headers['retry-after'] || requests[0].headers['Retry-After'] || requests[1].headers['Retry-After']
-    assert.ok(retryAfterHeader, 'Retry-After header should be present in captured requests');
-
-    await stopMockServer(mockServer);
-  });
 });

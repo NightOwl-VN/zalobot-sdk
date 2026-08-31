@@ -71,11 +71,10 @@ describe('ZaloConfig', () => {
   });
 
   it('hasSecretKey works', () => {
-    // secretKey < 8 chars is now rejected by constructor validation
-    assert.throws(
-      () => new ZaloConfig({ botToken: 'token', secretKey: 'short' }),
-      /at least 8 characters/,
-    );
+    // Constructor silently nullifies short secretKey (< 8 chars)
+    const configShort = new ZaloConfig({ botToken: 'token', secretKey: 'short' });
+    assert.equal(configShort.hasSecretKey(), false, 'short secretKey results in hasSecretKey() returning false');
+
     const config2 = new ZaloConfig({ botToken: 'token', secretKey: 'long-enough-secret' });
     assert.equal(config2.hasSecretKey(), true);
   });

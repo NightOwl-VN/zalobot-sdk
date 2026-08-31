@@ -52,7 +52,7 @@ describe('MessageModule', () => {
     it('should throw when chatId is missing', async () => {
       await assert.rejects(
         () => messageModule.sendText(null, 'Hello'),
-        /chatId is required/
+        /chat_id is required and must be a string/
       );
     });
 
@@ -74,7 +74,7 @@ describe('MessageModule', () => {
       const longText = 'a'.repeat(2001);
       await assert.rejects(
         () => messageModule.sendText('user123', longText),
-        /between 1 and 2000/
+        /text must be at most 2000 characters/
       );
     });
 
@@ -96,14 +96,14 @@ describe('MessageModule', () => {
     it('should throw when chatId is missing', async () => {
       await assert.rejects(
         () => messageModule.sendPhoto(null, 'https://example.com/photo.jpg'),
-        /chatId is required/
+        /chat_id is required and must be a string/
       );
     });
 
     it('should throw when photo URL is missing', async () => {
       await assert.rejects(
         () => messageModule.sendPhoto('user123', null),
-        /URL is required/
+        /is required and must be a string/
       );
     });
 
@@ -127,7 +127,7 @@ describe('MessageModule', () => {
     it('should throw when sticker is missing', async () => {
       await assert.rejects(
         () => messageModule.sendSticker('user123', null),
-        /sticker ID is required/
+        /sticker is required and must be a string/
       );
     });
   });
@@ -144,7 +144,7 @@ describe('MessageModule', () => {
     it('should throw when voice URL is missing', async () => {
       await assert.rejects(
         () => messageModule.sendVoice('user123', null),
-        /URL is required/
+        /is required and must be a string/
       );
     });
   });
@@ -205,7 +205,7 @@ describe('MessageModule', () => {
     it('should throw when secretToken is too short', async () => {
       await assert.rejects(
         () => messageModule.setWebhook('https://example.com/webhook', 'short'),
-        /8-256 characters/
+        /secretToken must be at least 8 characters/
       );
     });
   });
