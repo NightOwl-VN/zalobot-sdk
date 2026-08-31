@@ -30,11 +30,11 @@ class ZaloBotError extends Error {
     super(message, { cause });
     this.name = 'ZaloBotError';
     /** @type {string} Zalo error code identifier */
-    this.code = code || undefined;
+    this.code = code ?? undefined;
     /** @type {number} HTTP status code */
-    this.status = status || undefined;
+    this.status = status ?? undefined;
     /** @type {Object} Additional error details */
-    this.details = details || undefined;
+    this.details = details ?? undefined;
   }
 }
 

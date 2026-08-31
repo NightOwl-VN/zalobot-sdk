@@ -87,20 +87,77 @@ class UserModule {
    * @param {boolean} [options.forceRefresh=false] - Bypass cache
    * @returns {Promise<Object>} User profile data
    */
-  async getProfileCached(userId, options = {}) {
-    // Simple in-memory cache (can be extended with Redis)
-    if (!this._cache) {
-      this._cache = new Map();
-    }
+  /**
+   * Maximum number of entries the cache will hold before evicting oldest.
+   * @private
+   */
+  static get CACHE_MAX_SIZE() {
+    return 1000;
+  }
 
-    const cacheKey = `user:${userId}`;
-    const cacheTTL = 300000; // 5 minutes
+  /**
+   * Cache entry TTL in milliseconds (5 minutes).
+   * @private
+   */
+  static get CACHE_TTL() {
+    return 300000;
+  }
+
+  /**
+   * Lazily initialise the bounded cache map and metadata.
+   * @private
+   */
+  _initCache() {
+    if (this._cache) return;
+    this._cache = new Map();          // key → { data, timestamp }
+    this._cacheOrder = [];            // insertion-order keys for eviction
+  }
+
+  /**
+   * Evict entries whose TTL has expired.  Called on every cache read so stale
+   * entries don't accumulate.
+   * @private
+   */
+  _evictExpired() {
+    const now = Date.now();
+    const ttl = UserModule.CACHE_TTL;
+    for (const [key, entry] of this._cache) {
+      if (now - entry.timestamp >= ttl) {
+        this._cache.delete(key);
+        const idx = this._cacheOrder.indexOf(key);
+        if (idx !== -1) this._cacheOrder.splice(idx, 1);
+      }
+    }
+  }
+
+  /**
+   * Evict the oldest entries when the cache exceeds CACHE_MAX_SIZE.
+   * @private
+   */
+  _evictOldest() {
+    while (this._cacheOrder.length > UserModule.CACHE_MAX_SIZE) {
+      const oldestKey = this._cacheOrder.shift();
+      this._cache.delete(oldestKey);
+    }
+  }
+
+  /**
+   * Get user profile with caching (optional)
+   * @param {string} userId - Zalo user ID
+   * @param {Object} [options] - Additional options
+   * @param {string} [options.fields] - Comma-separated fields (affects cache key)
+   * @param {boolean} [options.forceRefresh=false] - Bypass cache
+   * @returns {Promise<Object>} User profile data
+   */
+  async getProfileCached(userId, options = {}) {
+    this._initCache();
+    this._evictExpired();
+
+    const fields = options.fields || 'default';
+    const cacheKey = `user:${userId}:${fields}`;
 
     if (!options.forceRefresh && this._cache.has(cacheKey)) {
-      const entry = this._cache.get(cacheKey);
-      if (Date.now() - entry.timestamp < cacheTTL) {
-        return entry.data;
-      }
+      return this._cache.get(cacheKey).data;
     }
 
     const profile = await this.getProfile(userId, options);
@@ -108,6 +165,8 @@ class UserModule {
       data: profile,
       timestamp: Date.now(),
     });
+    this._cacheOrder.push(cacheKey);
+    this._evictOldest();
 
     return profile;
   }
@@ -117,14 +176,30 @@ class UserModule {
    * @param {string} [userId] - Specific user ID to clear, or omit to clear all
    */
   clearCache(userId) {
-    if (!this._cache) {
-      this._cache = new Map();
-    }
+    this._initCache();
     if (userId) {
-      this._cache.delete(`user:${userId}`);
+      // Remove all keys matching this userId (across different field sets)
+      const prefix = `user:${userId}:`;
+      for (const key of this._cacheOrder) {
+        if (key.startsWith(prefix)) {
+          this._cache.delete(key);
+        }
+      }
+      this._cacheOrder = this._cacheOrder.filter((k) => this._cache.has(k));
     } else {
       this._cache.clear();
+      this._cacheOrder = [];
     }
+  }
+
+  /**
+   * Return the current number of entries in the cache.
+   * Useful for monitoring and debugging cache usage.
+   * @returns {number} Number of cached entries
+   */
+  getCacheSize() {
+    this._initCache();
+    return this._cache.size;
   }
 }
 

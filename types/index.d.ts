@@ -116,6 +116,8 @@ export interface GetFollowersParams {
 export interface WebhookOptions {
   /** Async handler called for each parsed event: (event, req, res) => Promise<void> */
   onEvent?: (event: WebhookEvent, req: WebhookRequest, res: WebhookResponse) => Promise<void>;
+  /** Error handler called when the event handler throws: (error, event, req) => void */
+  onError?: (error: Error, event: WebhookEvent, req: WebhookRequest) => void;
   /** Send 200 immediately before running the handler (default: false) */
   acknowledgeImmediately?: boolean;
 }
@@ -317,10 +319,10 @@ export interface WebhookEvent {
   event: string;
   /** Original Zalo event name (e.g. 'message.text.received') */
   eventName: string;
-  /** Sender user ID */
-  userId: string;
+  /** Sender user ID (null for events without message.from.id, e.g. user.follow) */
+  userId: string | null;
   /** Chat ID (falls back to userId for 1:1 chats) */
-  chatId: string;
+  chatId: string | null;
   /** Message ID (if applicable) */
   messageId: string | null;
   /** Timestamp (ms since epoch) */
@@ -641,7 +643,7 @@ export class UserModule {
  * Webhook module — parse and verify Zalo Bot webhook events.
  */
 export class WebhookModule {
-  constructor(config?: { secretKey?: string });
+  constructor(config?: { secretKey?: string; requireSecret?: boolean });
 
   /** Verify webhook request using X-Bot-Api-Secret-Token header (timing-safe) */
   verify(req: WebhookRequest): boolean;
@@ -654,6 +656,9 @@ export class WebhookModule {
   /** Quick handler for simple bots — shortcut for middleware({ onEvent }) */
   handle(handler: (event: WebhookEvent) => Promise<void>): (req: WebhookRequest, res: WebhookResponse) => Promise<void>;
 }
+
+/** Event name normalization map: Zalo raw event names → short canonical form (frozen) */
+export const EVENT_MAP: Readonly<Record<string, string>>;
 
 // ─────────────────────────────────────────────
 //  MediaModule

@@ -9,33 +9,14 @@
  * API Reference: https://bot.zapps.me/docs/apis/sendMessage/
  */
 
-const { ZaloValidationError } = require('../errors');
-
-function validateChatId(chatId) {
-  if (!chatId || typeof chatId !== 'string') {
-    throw new ZaloValidationError('chatId is required and must be a string', 'chat_id');
-  }
-}
-
-function validateMessageText(text) {
-  if (!text || typeof text !== 'string') {
-    throw new ZaloValidationError('text is required and must be a string', 'text');
-  }
-  if (text.length < 1 || text.length > 2000) {
-    throw new ZaloValidationError('Text must be between 1 and 2000 characters', 'text');
-  }
-}
-
-function validateUrl(url) {
-  if (!url || typeof url !== 'string') {
-    throw new ZaloValidationError('URL is required and must be a string', 'url');
-  }
-  try {
-    new URL(url);
-  } catch {
-    throw new ZaloValidationError('Invalid URL format', 'url');
-  }
-}
+const {
+  validateChatId,
+  validateMessageText,
+  validateUrl,
+  validateHttpsUrl,
+  validateSecretToken,
+  validateRequiredString,
+} = require('../utils/validate');
 
 class MessageModule {
   /** 
@@ -97,9 +78,7 @@ class MessageModule {
    */
   async sendSticker(chatId, sticker) {
     validateChatId(chatId);
-    if (!sticker || typeof sticker !== 'string') {
-      throw new ZaloValidationError('sticker ID is required', 'sticker');
-    }
+    validateRequiredString(sticker, 'sticker');
 
     const payload = {
       chat_id: chatId,
@@ -135,9 +114,7 @@ class MessageModule {
    */
   async sendChatAction(chatId, action) {
     validateChatId(chatId);
-    if (!action || typeof action !== 'string') {
-      throw new ZaloValidationError('action is required', 'action');
-    }
+    validateRequiredString(action, 'action');
 
     const payload = {
       chat_id: chatId,
@@ -174,12 +151,8 @@ class MessageModule {
    * @returns {Promise<Object>} { ok: true, result: { url, updated_at, verification } }
    */
   async setWebhook(url, secretToken) {
-    if (!url || typeof url !== 'string') {
-      throw new ZaloValidationError('url is required', 'url');
-    }
-    if (!secretToken || typeof secretToken !== 'string' || secretToken.length < 8 || secretToken.length > 256) {
-      throw new ZaloValidationError('secretToken must be 8-256 characters', 'secretToken');
-    }
+    validateHttpsUrl(url, 'url');
+    validateSecretToken(secretToken);
 
     return this.client.post('setWebhook', { url, secretToken });
   }

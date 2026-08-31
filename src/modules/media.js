@@ -23,20 +23,117 @@ const FormData = require('form-data');
 const pipelineAsync = promisify(pipeline);
 
 /**
- * Private IP ranges used for SSRF protection on download URLs.
+ * Private / reserved IP ranges used for SSRF protection on download URLs.
+ *
+ * Covers:
+ *   - IPv4 loopback (127.0.0.0/8), class-A private (10.0.0.0/8),
+ *     class-B private (172.16.0.0/12), class-C private (192.168.0.0/16),
+ *     unspecified (0.0.0.0/8)
+ *   - IPv6 loopback (::1), link-local (fe80::/10), ULA (fc00::/7)
+ *   - IPv4-mapped IPv6 (::ffff:127.0.0.1, ::ffff:10.x, etc.)
+ *   - Cloud metadata endpoints (169.254.169.254)
+ *   - localhost hostname
+ *
+ * NOTE — DNS rebinding: this list is checked against the hostname BEFORE any
+ * DNS resolution by the caller.  An attacker can register a domain that first
+ * resolves to a public IP, then TTL-expires and re-resolves to 127.0.0.1.
+ * A full mitigation requires resolving DNS and re-validating the IP inside the
+ * HTTP client (which is outside the scope of this module).  If this is a
+ * concern, resolve the hostname yourself and pass the resolved IP to
+ * `validateUrl()` with an explicit IP override, or use a DNS-resolving
+ * fetch wrapper.
+ *
  * @private
  */
 const PRIVATE_IP_RANGES = [
+  // IPv4 loopback and unspecified
   /^127\./,
-  /^10\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^192\.168\./,
   /^0\./,
+  /^0000\./,
+  // IPv4 class-A private (10.0.0.0/8)
+  /^10\./,
+  // IPv4 class-B private (172.16.0.0/12)
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  // IPv4 class-C private (192.168.0.0/16)
+  /^192\.168\./,
+  // Cloud / link-local metadata
+  /^169\.254\./,
+  // hostname
   /^localhost$/i,
-  /^\[::1\]$/,
+  // IPv6 loopback
+  /^::1$/i,
+  /^\[::1\]$/i,
+  // IPv6 link-local (fe80::/10) — matches fe80, fe90–fef0
+  /^fe[89a-f][0-9a-f]:/i,
+  /^\[fe[89a-f][0-9a-f]:/i,
+  // IPv6 ULA (fc00::/7) — fc and fd prefixes
+  /^f[cd]/i,
+  /^\[f[cd]/i,
+  // IPv4-mapped IPv6 loopback
+  /^::ffff:127\./i,
   /^\[::ffff:127\./i,
+  // IPv4-mapped IPv6 private ranges
+  /^::ffff:(10|172\.(1[6-9]|2\d|3[01])|192\.168)\./i,
   /^\[::ffff:(10|172\.(1[6-9]|2\d|3[01])|192\.168)\./i,
+  // IPv4-mapped IPv6 metadata
+  /^::ffff:169\.254\./i,
+  /^\[::ffff:169\.254\./i,
+  // IPv6 loopback mapped
+  /^::ffff::1$/i,
+  /^\[::ffff::1\]$/i,
 ];
+
+/**
+ * Validate that a URL is safe to fetch — blocks private / internal hosts to
+ * prevent SSRF attacks.  This function is **reusable** (exported from the
+ * module) so it can also guard webhook URL validation, redirect targets, or
+ * any other outbound request.
+ *
+ * @param {string} urlString - Absolute URL to validate
+ * @param {Object} [opts] - Options
+ * @param {boolean} [opts.allowFile=false] - Allow file:// protocol (dangerous)
+ * @throws {Error} If the URL targets a private/internal host or uses a
+ *   forbidden protocol
+ */
+function validateUrl(urlString, opts = {}) {
+  let parsed;
+  try {
+    parsed = new URL(urlString);
+  } catch {
+    throw new Error(`Invalid URL: ${urlString}`);
+  }
+
+  const allowedProtocols = ['http:', 'https:'];
+  if (opts.allowFile) allowedProtocols.push('file:');
+  if (!allowedProtocols.includes(parsed.protocol)) {
+    throw new Error(
+      `URL must use ${allowedProtocols.join(' or ')} protocol, got: ${parsed.protocol}`
+    );
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  for (const pattern of PRIVATE_IP_RANGES) {
+    if (pattern.test(hostname)) {
+      throw new Error(`URL must not target a private/internal host: ${hostname}`);
+    }
+  }
+
+  // Quick numeric IPv4 sanity — reject non-numeric hostnames that look like
+  // encoded IPs (e.g. 0x7f000001) if the hostname is purely hex digits.
+  if (/^0x[0-9a-f]+$/i.test(hostname)) {
+    const num = parseInt(hostname, 16);
+    if (
+      num >= 0x00000000 && num <= 0x00ffffff || // 0.0.0.0 – 0.255.255.255
+      num >= 0x7f000000 && num <= 0x7fffffff || // 127.0.0.0 – 127.255.255.255
+      num >= 0x0a000000 && num <= 0x0affffff || // 10.0.0.0 – 10.255.255.255
+      num >= 0xac100000 && num <= 0xac1fffff || // 172.16.0.0 – 172.31.255.255
+      num >= 0xc0a80000 && num <= 0xc0a8ffff || // 192.168.0.0 – 192.168.255.255
+      num >= 0xa9fe0000 && num <= 0xa9feffff    // 169.254.0.0 – 169.254.255.255
+    ) {
+      throw new Error(`URL must not target a private/internal host: ${hostname}`);
+    }
+  }
+}
 
 class MediaModule {
   /**
@@ -140,7 +237,14 @@ class MediaModule {
       ...(options.redirect && { redirect: 'true' }),
     });
 
-    return result.url || result.data?.url || null;
+    const url = result.url || result.data?.url || null;
+
+    // SSRF protection: validate the returned URL before exposing it
+    if (url) {
+      validateUrl(url);
+    }
+
+    return url;
   }
 
   /**
@@ -193,30 +297,13 @@ class MediaModule {
 
   /**
    * Validate that a download URL is safe to fetch.
-   * Blocks private/internal hosts to prevent SSRF attacks.
+   * Delegates to the exported {@link validateUrl} function.
    * @private
    * @param {string} urlString - Absolute URL to validate
    * @throws {Error} If the URL targets a private/internal host
    */
   _validateDownloadUrl(urlString) {
-    let parsed;
-    try {
-      parsed = new URL(urlString);
-    } catch {
-      throw new Error(`Invalid download URL: ${urlString}`);
-    }
-
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      throw new Error(`Download URL must use http or https protocol, got: ${parsed.protocol}`);
-    }
-
-    const hostname = parsed.hostname.toLowerCase();
-
-    for (const pattern of PRIVATE_IP_RANGES) {
-      if (pattern.test(hostname)) {
-        throw new Error(`Download URL must not target a private/internal host: ${hostname}`);
-      }
-    }
+    validateUrl(urlString);
   }
 
   // ──────────────────────────────────────────────
@@ -271,3 +358,4 @@ class MediaModule {
 }
 
 module.exports = MediaModule;
+module.exports.validateUrl = validateUrl;

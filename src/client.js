@@ -36,9 +36,8 @@ class ZaloClient {
    * Create a new Zalo Bot API client
    * @param {Object} config - Client configuration
    * @param {string} config.botToken - Zalo Bot Token (e.g. "123456789:abc-xyz")
-   * @param {string} [config.secretKey] - Secret token for webhook verification
    * @param {number} [config.timeout=30000] - Request timeout in milliseconds
-   * @param {string} [config.baseURL] - Custom API base URL
+   * @param {string} [config.baseURL] - Platform host URL (e.g. "https://bot-api.zaloplatforms.com")
    * @param {number} [config.maxRetries=3] - Legacy: max retry attempts (use retry.maxRetries instead)
    * @param {Object} [config.retry] - Retry configuration
    * @param {boolean} [config.retry.enabled=true] - Enable/disable retries
@@ -49,7 +48,6 @@ class ZaloClient {
    * @example
    * const client = new ZaloClient({
    *   botToken: '123456789:abc-xyz',
-   *   secretKey: 'my-secret-token',
    *   retry: { enabled: true, maxRetries: 5, baseDelay: 500 },
    * });
    */
@@ -59,9 +57,12 @@ class ZaloClient {
     }
 
     this.botToken = config.botToken;
-    this.secretKey = config.secretKey || null;
     this.timeout = config.timeout || 30000;
-    this.baseURL = config.baseURL || `https://bot-api.zaloplatforms.com/bot${this.botToken}`;
+
+    // apiBaseURL = platform host (e.g. "https://bot-api.zaloplatforms.com")
+    // requestBaseURL = full URL used for all requests (apiBaseURL + /bot{token})
+    this.apiBaseURL = (config.baseURL || 'https://bot-api.zaloplatforms.com').replace(/\/+$/, '');
+    this.requestBaseURL = `${this.apiBaseURL}/bot${this.botToken}`;
 
     // Merge retry config: explicit retry object wins, else derive from legacy maxRetries
     this.retry = {
@@ -71,7 +72,7 @@ class ZaloClient {
     };
 
     this._axios = axios.create({
-      baseURL: this.baseURL,
+      baseURL: this.requestBaseURL,
       timeout: this.timeout,
       headers: {
         'Content-Type': 'application/json',
@@ -156,8 +157,8 @@ class ZaloClient {
    */
   updateBotToken(newToken) {
     this.botToken = newToken;
-    this.baseURL = `https://bot-api.zaloplatforms.com/bot${newToken}`;
-    this._axios.defaults.baseURL = this.baseURL;
+    this.requestBaseURL = `${this.apiBaseURL}/bot${newToken}`;
+    this._axios.defaults.baseURL = this.requestBaseURL;
   }
 
   /**
@@ -165,10 +166,12 @@ class ZaloClient {
    * @returns {Object} Configuration snapshot
    */
   getConfig() {
+    const maskedToken = this.botToken ? `${this.botToken.substring(0, 6)}...` : null;
     return {
-      botToken: this.botToken ? `${this.botToken.substring(0, 6)}...` : null,
+      botToken: maskedToken,
       timeout: this.timeout,
-      baseURL: this.baseURL,
+      apiBaseURL: this.apiBaseURL,
+      requestBaseURL: maskedToken ? `${this.apiBaseURL}/bot${maskedToken}` : this.apiBaseURL,
       retry: { ...this.retry },
     };
   }

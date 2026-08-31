@@ -89,6 +89,24 @@ class ZaloConfig {
   }
 
   /**
+   * Mask a bot token for safe display.
+   * Shows first 6 characters followed by '...' to prevent full token leakage.
+   *
+   * @param {string|null} token - The token to mask
+   * @returns {string} Masked token or 'not set' if null/undefined
+   * @private
+   * @example
+   * ZaloConfig._maskToken('123456789:abc-xyz');
+   * // '123456...'
+   */
+  static _maskToken(token) {
+    if (!token) return 'not set';
+    if (typeof token !== 'string') return 'not set';
+    if (token.length <= 6) return '***';
+    return token.substring(0, 6) + '...';
+  }
+
+  /**
    * Parse a value into a non-negative integer, falling back to a default.
    * Preserves 0 as a valid value (unlike || which treats 0 as falsy).
    *
@@ -133,25 +151,39 @@ class ZaloConfig {
         throw new Error(`baseURL is not a valid URL: "${this.baseURL}"`);
       }
     }
+    if (this.secretKey !== null && this.secretKey !== undefined) {
+      if (typeof this.secretKey !== 'string') {
+        this.secretKey = null;
+      } else if (this.secretKey.length < 8) {
+        this.secretKey = null;
+      } else if (this.secretKey.length > 256) {
+        this.secretKey = null;
+      }
+    }
   }
 
   /**
    * Get configuration as a plain object.
    * Excludes secretKey by default to prevent accidental secret leakage.
+   * Bot token is masked by default (e.g. '123456...') — pass fullToken: true to reveal.
    *
    * @param {Object} [opts] - Options for the output
    * @param {boolean} [opts.includeSecrets=false] - Whether to include secretKey
+   * @param {boolean} [opts.fullToken=false] - Whether to include the full bot token
    * @returns {Object} Plain configuration object with all fields
    * @example
-   * // Safe — excludes secretKey
+   * // Safe — excludes secretKey, masks token
    * const safe = config.toObject();
    *
    * // Includes secretKey (use with caution)
    * const full = config.toObject({ includeSecrets: true });
+   *
+   * // Reveals full token
+   * const withToken = config.toObject({ fullToken: true });
    */
-  toObject({ includeSecrets = false } = {}) {
+  toObject({ includeSecrets = false, fullToken = false } = {}) {
     const obj = {
-      botToken: this.botToken,
+      botToken: fullToken ? this.botToken : ZaloConfig._maskToken(this.botToken),
       timeout: this.timeout,
       maxRetries: this.maxRetries,
       baseURL: this.baseURL,
@@ -165,21 +197,26 @@ class ZaloConfig {
   /**
    * Get configuration as a safe plain object.
    * Never exposes secretKey unless explicitly requested.
+   * Bot token is masked by default — pass fullToken: true to reveal.
    * This is the recommended method for logging or passing to non-trusted consumers.
    *
    * @param {Object} [opts] - Options for the output
    * @param {boolean} [opts.includeSecrets=false] - Whether to include secretKey (default: false)
+   * @param {boolean} [opts.fullToken=false] - Whether to include the full bot token (default: false)
    * @returns {Object} Plain configuration object
    * @example
-   * // Always safe — secret excluded by default
+   * // Always safe — secret excluded, token masked
    * console.log(config.getConfig());
    *
    * // Explicitly include secrets (use with care)
    * console.log(config.getConfig({ includeSecrets: true }));
+   *
+   * // Reveal full token
+   * console.log(config.getConfig({ fullToken: true }));
    */
-  getConfig({ includeSecrets = false } = {}) {
+  getConfig({ includeSecrets = false, fullToken = false } = {}) {
     const result = {
-      botToken: this.botToken,
+      botToken: fullToken ? this.botToken : ZaloConfig._maskToken(this.botToken),
       timeout: this.timeout,
       maxRetries: this.maxRetries,
       baseURL: this.baseURL,

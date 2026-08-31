@@ -42,6 +42,10 @@ function createMockServer() {
     requests: [],
     /** @type {Map<string, {status:number, body:Object}>} key = "METHOD /path" */
     overrides: new Map(),
+    /** @type {Map<string, Array<{status:number, body:Object, headers?:Object}>>} key = "METHOD /path" */
+    sequentialResponses: new Map(),
+    /** @type {Map<string, number>} tracks current index into sequentialResponses */
+    sequentialCounts: new Map(),
     /** Milliseconds added to every response (0 = none) */
     delay: 0,
   };
@@ -53,7 +57,9 @@ function createMockServer() {
       let parsed = {};
       try { parsed = body ? JSON.parse(body) : {}; } catch { return; }
 
-      const url = (req.url || '').split('?')[0];
+      // Strip /bot{TOKEN} prefix — client sends /bot{TOKEN}/method
+      const rawUrl = (req.url || '').split('?')[0];
+      const url = rawUrl.replace(/^\/bot[^/]+/, '');
       const query = (req.url || '').split('?')[1] || '';
       const method = req.method;
       const key = `${method} ${url}`;
@@ -84,7 +90,29 @@ function createMockServer() {
         }
       };
 
-      // ── Check for test overrides first ───────────────────────────
+      // ── Check for sequential responses first ─────────────────────
+      if (_state.sequentialResponses.has(key)) {
+        const seq = _state.sequentialResponses.get(key);
+        const count = _state.sequentialCounts.get(key) || 0;
+        const idx = Math.min(count, seq.length - 1);
+        _state.sequentialCounts.set(key, count + 1);
+        const resp = seq[idx];
+        const headers = resp.headers || {};
+        const payload = JSON.stringify(resp.body);
+        const finish = () => {
+          res.writeHead(resp.status, {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+            ...headers,
+          });
+          res.end(payload);
+        };
+        if (_state.delay > 0) setTimeout(finish, _state.delay);
+        else finish();
+        return;
+      }
+
+      // ── Check for test overrides next ────────────────────────────
       if (_state.overrides.has(key)) {
         const o = _state.overrides.get(key);
         return send(o.status, o.body);
@@ -295,6 +323,27 @@ function createMockServer() {
     },
 
     /**
+     * Set a sequence of responses for an endpoint, returned in order.
+     * After exhausting the list, the last response repeats for all subsequent calls.
+     * Useful for retry testing (e.g. first call fails, second succeeds).
+     *
+     * @param {string} method - HTTP method ('GET', 'POST', …)
+     * @param {string} url - URL path (e.g. '/sendMessage')
+     * @param {Array<{status:number, body:Object, headers?:Object}>} responses - ordered responses
+     *
+     * @example
+     *   // First call returns 500, second call succeeds
+     *   server._mock.setSequentialResponses('POST', '/sendMessage', [
+     *     { status: 500, body: { ok: false, error_code: 500, description: 'Server Error' } },
+     *     { status: 200, body: { ok: true, result: { message_id: 'msg_1' } } },
+     *   ]);
+     */
+    setSequentialResponses(method, url, responses) {
+      _state.sequentialResponses.set(`${method} ${url}`, responses.slice());
+      _state.sequentialCounts.set(`${method} ${url}`, 0);
+    },
+
+    /**
      * Add an artificial delay (ms) to every mock response.
      * Useful for testing client timeout behavior.
      * Pass 0 to remove the delay.
@@ -310,6 +359,8 @@ function createMockServer() {
      */
     reset() {
       _state.overrides.clear();
+      _state.sequentialResponses.clear();
+      _state.sequentialCounts.clear();
       _state.requests.length = 0;
       _state.delay = 0;
     },

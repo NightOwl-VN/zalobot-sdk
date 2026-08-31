@@ -77,8 +77,8 @@ class ZaloBot {
       this.config = new ZaloConfig(config);
     }
 
-    // ZaloClient needs the full config including secretKey for webhook support
-    this.client = new ZaloClient(this.config.toObject({ includeSecrets: true }));
+    // ZaloClient only needs botToken, timeout, baseURL, retry — NOT secretKey
+    this.client = new ZaloClient(this.config.toObject());
 
     // Initialize modules — each receives the shared client
     this.message = new MessageModule(this.client);
@@ -104,16 +104,20 @@ class ZaloBot {
    *
    * @param {Object} [opts] - Options for the output
    * @param {boolean} [opts.includeSecrets=false] - Whether to include secretKey
+   * @param {boolean} [opts.fullToken=false] - Whether to include the full bot token
    * @returns {Object} Plain configuration object
    * @example
-   * // Safe — excludes secretKey
+   * // Safe — excludes secretKey, masks token
    * console.log(bot.getConfig());
    *
    * // Include secrets when needed
    * const full = bot.getConfig({ includeSecrets: true });
+   *
+   * // Reveal full token
+   * console.log(bot.getConfig({ fullToken: true }));
    */
-  getConfig({ includeSecrets = false } = {}) {
-    return this.config.getConfig({ includeSecrets });
+  getConfig({ includeSecrets = false, fullToken = false } = {}) {
+    return this.config.getConfig({ includeSecrets, fullToken });
   }
 
   /**

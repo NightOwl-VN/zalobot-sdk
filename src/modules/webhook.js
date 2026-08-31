@@ -14,7 +14,7 @@ const crypto = require('crypto');
 const { ZaloWebhookError } = require('../errors');
 
 /** Event name normalization map: Zalo raw event names → short canonical form */
-const EVENT_MAP = {
+const EVENT_MAP = Object.freeze({
   'message.text.received': 'user_text',
   'message.image.received': 'user_image',
   'message.sticker.received': 'user_sticker',
@@ -22,15 +22,17 @@ const EVENT_MAP = {
   'message.unsupported.received': 'user_unsupported',
   'user.follow': 'user_follow',
   'user.unfollow': 'user_unfollow',
-};
+});
 
 class WebhookModule {
   /**
    * @param {Object} config - Webhook configuration
    * @param {string} [config.secretKey] - Secret token set via setWebhook
+   * @param {boolean} [config.requireSecret=true] - Require secret token verification
    */
   constructor(config = {}) {
     this.secretKey = config.secretKey || null;
+    this.requireSecret = config.requireSecret !== false; // default: true
   }
 
   /**
@@ -41,18 +43,18 @@ class WebhookModule {
    */
   verify(req) {
     if (!this.secretKey) {
-      return true;
+      return !this.requireSecret;
     }
 
     const token = req.headers && req.headers['x-bot-api-secret-token'];
     if (!token || typeof token !== 'string') {
-      return false;
+      return !this.requireSecret;
     }
 
     const a = Buffer.from(token, 'utf8');
     const b = Buffer.from(this.secretKey, 'utf8');
     if (a.length !== b.length) {
-      return false;
+      return !this.requireSecret;
     }
 
     return crypto.timingSafeEqual(a, b);
@@ -91,10 +93,18 @@ class WebhookModule {
     }
 
     const msg = result.message || null;
-    const userId = msg && msg.from ? msg.from.id : null;
-    const chatId = (msg && msg.chat ? msg.chat.id : userId);
-    if (!userId) {
-      throw new ZaloWebhookError('Missing sender user ID in payload', 400);
+
+    // Event parser safety: for events that don't have message.from.id
+    // (like user.follow), set userId to null instead of throwing
+    let userId = null;
+    let chatId = null;
+    if (msg && msg.from && msg.from.id !== undefined) {
+      userId = msg.from.id;
+      chatId = msg.chat ? msg.chat.id : userId;
+    } else if (msg && msg.id !== undefined) {
+      // Alternative field for events like user.follow
+      userId = msg.id;
+      chatId = userId;
     }
 
     const normalizedEvent = EVENT_MAP[eventName] || eventName;
@@ -136,11 +146,13 @@ class WebhookModule {
    * Create Express.js middleware for webhook handling.
    * @param {Object} [options]
    * @param {Function} [options.onEvent] - Async handler: async (event, req, res) => void
-   * @param {boolean}  [options.acknowledgeImmediately] - Respond 200 before running handler
+   * @param {Function} [options.onError] - Error handler: async (error, event, req) => void
+   * @param {boolean} [options.acknowledgeImmediately=false] - Respond 200 before running handler
    * @returns {Function} Express middleware
    */
   middleware(options = {}) {
     const onEvent = options.onEvent || null;
+    const onError = options.onError || null;
     const acknowledgeImmediately = !!options.acknowledgeImmediately;
 
     return async (req, res) => {
@@ -157,7 +169,11 @@ class WebhookModule {
         return res.status(status).json({ message: error.message });
       }
 
-      if (acknowledgeImmediately) {
+      // Acknowledge behavior:
+      // When acknowledgeImmediately=true, send 200 BEFORE running handler
+      // When false (default), send 200 AFTER handler completes
+      // Always check res.headersSent before sending
+      if (acknowledgeImmediately && !res.headersSent) {
         res.status(200).json({ message: 'Success' });
       }
 
@@ -165,11 +181,29 @@ class WebhookModule {
         try {
           await onEvent(event, req, res);
         } catch (error) {
-          console.error('[Zalo Webhook] Handler error:', error.message);
+          // onError callback: when handler throws, call onError if provided,
+          // otherwise log to console.error
+          if (typeof onError === 'function') {
+            try {
+              onError(error, event, req);
+            } catch (e) {
+              console.error('[Zalo Webhook] onError handler failed:', e.message);
+            }
+          } else {
+            console.error('[Zalo Webhook] Handler error:', error.message);
+          }
+
+          // Handler failure:
+          // If handler throws AND acknowledgeImmediately=true (ACK already sent), don't send another response
+          // If acknowledgeImmediately=false, send 500 on handler failure
+          if (!acknowledgeImmediately && !res.headersSent) {
+            res.status(500).json({ message: 'Internal Server Error' });
+          }
         }
       }
 
-      if (!res.headersSent) {
+      // Send 200 AFTER handler completes (when acknowledgeImmediately=false)
+      if (!acknowledgeImmediately && !res.headersSent) {
         res.status(200).json({ message: 'Success' });
       }
     };
@@ -186,3 +220,4 @@ class WebhookModule {
 }
 
 module.exports = WebhookModule;
+module.exports.EVENT_MAP = EVENT_MAP;

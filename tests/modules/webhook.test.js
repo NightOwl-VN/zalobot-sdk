@@ -6,7 +6,7 @@
 
 /**
  * Unit tests for WebhookModule
- * Tests: token verification, event parsing, middleware
+ * Tests: token verification, event parsing, middleware, security defaults
  * @module tests/modules/webhook
  */
 
@@ -14,6 +14,7 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const WebhookModule = require('../../src/modules/webhook');
+const { EVENT_MAP } = require('../../src/modules/webhook');
 
 describe('WebhookModule', () => {
   let webhookModule;
@@ -52,16 +53,25 @@ describe('WebhookModule', () => {
     });
 
     /**
-     * Test: Returns true when no secret key is configured
+     * Test: Returns false when no secret key is configured (requireSecret=true default)
      */
-    it('should return true when no secret key is configured', () => {
+    it('should return false when no secret key is configured (secure default)', () => {
       const noKeyModule = new WebhookModule({});
       const req = { headers: {} };
-      assert.equal(noKeyModule.verify(req), true);
+      assert.equal(noKeyModule.verify(req), false);
     });
 
     /**
-     * Test: Returns false when token header is missing
+     * Test: Returns true when no secret key and requireSecret=false (dev mode)
+     */
+    it('should return true when requireSecret=false and no secret key (dev mode)', () => {
+      const devModule = new WebhookModule({ requireSecret: false });
+      const req = { headers: {} };
+      assert.equal(devModule.verify(req), true);
+    });
+
+    /**
+     * Test: Returns false when token header is missing (with secret configured)
      */
     it('should return false when token header is missing', () => {
       const req = { headers: {} };
@@ -99,6 +109,43 @@ describe('WebhookModule', () => {
         () => webhookModule.requireValid(req),
         /Invalid webhook secret token/
       );
+    });
+  });
+
+  // ── EVENT_MAP ─────────────────────────────────────
+
+  describe('EVENT_MAP', () => {
+    /**
+     * Test: EVENT_MAP is frozen (immutable)
+     */
+    it('should be frozen (immutable)', () => {
+      assert.equal(Object.isFrozen(EVENT_MAP), true);
+    });
+
+    /**
+     * Test: Cannot add properties to EVENT_MAP
+     */
+    it('should not allow modification', () => {
+      const original = Object.keys(EVENT_MAP).length;
+      try {
+        EVENT_MAP['new.event'] = 'new_event'; // eslint-disable-line no-unused-vars
+      } catch (e) {
+        // In strict mode this would throw
+      }
+      assert.equal(Object.keys(EVENT_MAP).length, original);
+    });
+
+    /**
+     * Test: All expected mappings exist
+     */
+    it('should contain all expected event mappings', () => {
+      assert.equal(EVENT_MAP['message.text.received'], 'user_text');
+      assert.equal(EVENT_MAP['message.image.received'], 'user_image');
+      assert.equal(EVENT_MAP['message.sticker.received'], 'user_sticker');
+      assert.equal(EVENT_MAP['message.voice.received'], 'user_voice');
+      assert.equal(EVENT_MAP['message.unsupported.received'], 'user_unsupported');
+      assert.equal(EVENT_MAP['user.follow'], 'user_follow');
+      assert.equal(EVENT_MAP['user.unfollow'], 'user_unfollow');
     });
   });
 
@@ -225,13 +272,58 @@ describe('WebhookModule', () => {
     });
 
     /**
-     * Test: Throws when from.id is missing
+     * Test: Does NOT throw when from.id is missing — sets userId to null (safety)
      */
-    it('should throw when from.id is missing', () => {
-      assert.throws(
-        () => webhookModule.parseEvent({ event_name: 'message.text.received' }),
-        /Missing sender user ID/
-      );
+    it('should set userId to null when from.id is missing (event safety)', () => {
+      const payload = {
+        event_name: 'message.text.received',
+        message: { text: 'Hello' },
+      };
+
+      const event = webhookModule.parseEvent(payload);
+      assert.equal(event.userId, null);
+      assert.equal(event.chatId, null);
+      assert.equal(event.event, 'user_text');
+    });
+
+    /**
+     * Test: user.follow event parsed safely without from.id
+     */
+    it('should handle user.follow event without message.from.id', () => {
+      const payload = {
+        ok: true,
+        result: {
+          event_name: 'user.follow',
+          message: {
+            id: 'follow_user_123',
+            date: 1700000000,
+          },
+        },
+      };
+
+      const event = webhookModule.parseEvent(payload);
+      assert.equal(event.event, 'user_follow');
+      assert.equal(event.userId, 'follow_user_123');
+      assert.equal(event.chatId, 'follow_user_123');
+    });
+
+    /**
+     * Test: Unknown event name is preserved (not silently converted)
+     */
+    it('should preserve unknown event names safely', () => {
+      const payload = {
+        event_name: 'some.unknown.event',
+        message: {
+          from: { id: 'user_unknown' },
+          chat: { id: 'user_unknown' },
+        },
+      };
+
+      const event = webhookModule.parseEvent(payload);
+      assert.equal(event.event, 'some.unknown.event');
+      assert.equal(event.userId, 'user_unknown');
+      // Falls through to default case in switch
+      assert.ok(event.message);
     });
   });
 
@@ -239,73 +331,177 @@ describe('WebhookModule', () => {
 
   describe('middleware()', () => {
     /**
-     * Test: Middleware returns 200 for valid webhook request
+     * Helper: create mock req/res objects
      */
-    it('should return 200 for valid webhook request', async () => {
-      const payload = {
-        ok: true,
-        result: {
-          event_name: 'message.text.received',
-          message: {
-            from: { id: 'user123' },
-            chat: { id: 'user123' },
-            text: 'Hi',
-            message_id: 'msg_001',
-            date: 1700000000,
+    function mockReqRes(secret, payload) {
+      const req = {
+        headers: secret ? { 'x-bot-api-secret-token': secret } : {},
+        body: payload || {
+          ok: true,
+          result: {
+            event_name: 'message.text.received',
+            message: {
+              from: { id: 'user123' },
+              chat: { id: 'user123' },
+              text: 'Hi',
+              message_id: 'msg_001',
+              date: 1700000000,
+            },
           },
         },
       };
 
+      let statusCode = 200;
+      let responseBody = null;
+      let headersSent = false;
+      const res = {
+        get headersSent() { return headersSent; },
+        status(code) { statusCode = code; return this; },
+        json(data) {
+          responseBody = data;
+          headersSent = true;
+        },
+      };
+
+      return { req, res, get: () => ({ statusCode, responseBody }) };
+    }
+
+    /**
+     * Test: Middleware returns 200 for valid webhook request
+     */
+    it('should return 200 for valid webhook request', async () => {
+      const { req, res, get } = mockReqRes(SECRET_KEY);
       const middleware = webhookModule.middleware({
         async onEvent() {},
       });
 
-      let statusCode = 0;
-      let responseBody = null;
-      const req = {
-        headers: { 'x-bot-api-secret-token': SECRET_KEY },
-        body: payload,
-      };
-      const res = {
-        status(code) { statusCode = code; return this; },
-        json(data) { responseBody = data; },
-      };
-
       await middleware(req, res, () => {});
-      assert.equal(statusCode, 200);
-      assert.deepEqual(responseBody, { message: 'Success' });
+      const state = get();
+      assert.equal(state.statusCode, 200);
+      assert.deepEqual(state.responseBody, { message: 'Success' });
     });
 
     /**
      * Test: Middleware returns 403 for invalid secret token
      */
     it('should return 403 for invalid secret token', async () => {
-      const payload = {
-        ok: true,
-        result: {
-          event_name: 'message.text.received',
-          message: {
-            from: { id: 'user123' },
-            chat: { id: 'user123' },
-            text: 'Hi',
-          },
+      const { req, res, get } = mockReqRes('wrong_token');
+      const middleware = webhookModule.middleware();
+
+      await middleware(req, res, () => {});
+      const state = get();
+      assert.equal(state.statusCode, 403);
+    });
+
+    /**
+     * Test: acknowledgeImmediately=true sends 200 BEFORE handler runs
+     */
+    it('should send 200 before handler when acknowledgeImmediately=true', async () => {
+      const { req, res, get } = mockReqRes(SECRET_KEY);
+      let handlerRan = false;
+
+      const middleware = webhookModule.middleware({
+        acknowledgeImmediately: true,
+        async onEvent(event) {
+          // At this point, 200 should already be sent
+          assert.equal(res.headersSent, true);
+          handlerRan = true;
+        },
+      });
+
+      await middleware(req, res, () => {});
+      assert.equal(handlerRan, true);
+    });
+
+    /**
+     * Test: acknowledgeImmediately=false sends 200 AFTER handler completes
+     */
+    it('should send 200 after handler when acknowledgeImmediately=false', async () => {
+      const { req, res, get } = mockReqRes(SECRET_KEY);
+      let handlerRan = false;
+
+      const middleware = webhookModule.middleware({
+        acknowledgeImmediately: false,
+        async onEvent(event) {
+          assert.equal(res.headersSent, false);
+          handlerRan = true;
+        },
+      });
+
+      await middleware(req, res, () => {});
+      const state = get();
+      assert.equal(handlerRan, true);
+      assert.equal(state.statusCode, 200);
+    });
+
+    /**
+     * Test: onError callback is called when handler throws
+     */
+    it('should call onError when handler throws', async () => {
+      const { req, res, get } = mockReqRes(SECRET_KEY);
+      let caughtError = null;
+      let caughtEvent = null;
+
+      const middleware = webhookModule.middleware({
+        async onEvent() {
+          throw new Error('handler exploded');
+        },
+        onError(error, event, request) {
+          caughtError = error;
+          caughtEvent = event;
+        },
+      });
+
+      await middleware(req, res, () => {});
+      assert.equal(caughtError.message, 'handler exploded');
+      assert.equal(caughtEvent.userId, 'user123');
+    });
+
+    /**
+     * Test: Handler failure sends 500 when acknowledgeImmediately=false
+     */
+    it('should send 500 on handler failure when acknowledgeImmediately=false', async () => {
+      const { req, res, get } = mockReqRes(SECRET_KEY);
+
+      const middleware = webhookModule.middleware({
+        acknowledgeImmediately: false,
+        async onEvent() {
+          throw new Error('handler failed');
+        },
+      });
+
+      await middleware(req, res, () => {});
+      const state = get();
+      assert.equal(state.statusCode, 500);
+    });
+
+    /**
+     * Test: Handler failure does NOT send another response when acknowledgeImmediately=true
+     */
+    it('should not send response when handler fails after ack sent', async () => {
+      const { req, res, get } = mockReqRes(SECRET_KEY);
+      let sendCount = 0;
+      let headersSent = false;
+
+      const specialRes = {
+        get headersSent() { return headersSent; },
+        status(code) { return this; },
+        json(data) {
+          sendCount++;
+          headersSent = true;
         },
       };
 
-      const middleware = webhookModule.middleware();
+      const middleware = webhookModule.middleware({
+        acknowledgeImmediately: true,
+        async onEvent() {
+          throw new Error('handler failed after ack');
+        },
+      });
 
-      let statusCode = 0;
-      const req = {
-        headers: { 'x-bot-api-secret-token': 'wrong_token' },
-        body: payload,
-      };
-      const res = {
-        status(code) { statusCode = code; return this; },
-        json() {},
-      };
-
-      await middleware(req, res, () => {});
-      assert.equal(statusCode, 403);
+      await middleware(req, specialRes, () => {});
+      // Only the initial 200 ack, no second response
+      assert.equal(sendCount, 1);
     });
   });
 });

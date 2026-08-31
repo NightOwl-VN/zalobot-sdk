@@ -6,8 +6,9 @@
 
 /**
  * Unit tests for MessageModule
- * Tests: sendMessage, sendPhoto, sendSticker, sendVoice, sendChatAction
- * @module tests/modules/message
+ * Tests: sendMessage, sendPhoto, sendSticker, sendVoice, sendChatAction,
+ *         getMe, getUpdates, setWebhook, testWebhook, deleteWebhook, getWebhookInfo
+ * @module tests/modules/message.test
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
