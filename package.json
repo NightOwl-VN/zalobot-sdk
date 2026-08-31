@@ -3,11 +3,16 @@
   "version": "1.0.0",
   "description": "A lightweight, modular Node.js SDK and Webhook handler for Zalo Bot API. Fully typed with JSDoc and ready for production.",
   "main": "src/index.js",
+  "types": "types/index.d.ts",
   "scripts": {
     "test": "node --test tests/**/*.test.js",
     "test:coverage": "node --test --experimental-test-coverage tests/**/*.test.js",
     "example:webhook": "node examples/express-webhook.js",
-    "example:send": "node examples/send-message.js"
+    "example:send": "node examples/send-message.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check": "node --check src/**/*.js",
+    "prepublishOnly": "npm run check"
   },
   "keywords": [
     "zalo",
@@ -38,12 +43,15 @@
   },
   "files": [
     "src/",
+    "types/",
     "LICENSE",
     "README.md"
   ],
   "dependencies": {
     "axios": "^1.20.0",
-    "dotenv": "^17.4.2",
     "form-data": "^4.0.6"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5"
   }
 }

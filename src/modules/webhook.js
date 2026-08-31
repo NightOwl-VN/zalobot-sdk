@@ -6,9 +6,23 @@
 
 /**
  * Webhook module - Parse and verify Zalo Bot webhook events
- * Authentication: X-Bot-Api-Secret-Token header (plain comparison, NOT HMAC)
+ * Authentication: X-Bot-Api-Secret-Token header (timing-safe comparison)
  * Reference: https://bot.zapps.me/docs/webhook/
  */
+
+const crypto = require('crypto');
+const { ZaloWebhookError } = require('../errors');
+
+/** Event name normalization map: Zalo raw event names → short canonical form */
+const EVENT_MAP = {
+  'message.text.received': 'user_text',
+  'message.image.received': 'user_image',
+  'message.sticker.received': 'user_sticker',
+  'message.voice.received': 'user_voice',
+  'message.unsupported.received': 'user_unsupported',
+  'user.follow': 'user_follow',
+  'user.unfollow': 'user_unfollow',
+};
 
 class WebhookModule {
   /**
@@ -20,113 +34,81 @@ class WebhookModule {
   }
 
   /**
-   * Verify webhook request using X-Bot-Api-Secret-Token header
-   * Zalo Bot sends this header with every webhook request — compare it directly
-   * against the secret token you configured via setWebhook.
+   * Verify webhook request using X-Bot-Api-Secret-Token header.
+   * Uses timing-safe comparison to prevent timing attacks.
    * @param {Object} req - Express request object (or any object with headers)
    * @returns {boolean} True if token matches
-   * @example
-   * app.post('/webhook', (req, res) => {
-   *   if (!bot.webhook.verify(req)) {
-   *     return res.status(403).json({ message: 'Unauthorized' });
-   *   }
-   *   // process webhook...
-   * });
    */
   verify(req) {
     if (!this.secretKey) {
-      // No secret configured — skip verification
       return true;
     }
+
     const token = req.headers && req.headers['x-bot-api-secret-token'];
     if (!token || typeof token !== 'string') {
       return false;
     }
-    // Use timing-safe comparison to prevent timing attacks
-    if (token.length !== this.secretKey.length) {
+
+    const a = Buffer.from(token, 'utf8');
+    const b = Buffer.from(this.secretKey, 'utf8');
+    if (a.length !== b.length) {
       return false;
     }
-    const crypto = require('crypto');
-    return crypto.timingSafeEqual(
-      Buffer.from(token, 'utf8'),
-      Buffer.from(this.secretKey, 'utf8')
-    );
+
+    return crypto.timingSafeEqual(a, b);
   }
 
   /**
-   * Verify and throw if invalid
+   * Verify and throw ZaloWebhookError if invalid
    * @param {Object} req - Express request object
-   * @throws {Error} If verification fails
+   * @throws {ZaloWebhookError} If verification fails
    */
   requireValid(req) {
     if (!this.verify(req)) {
-      throw new Error('Invalid webhook secret token');
+      throw new ZaloWebhookError('Invalid webhook secret token', 403);
     }
   }
 
   /**
-   * Parse webhook event payload
-   * Zalo Bot webhook sends: { ok: true, result: { event_name, message: { from, chat, text, ... } } }
-   * Reference: https://bot.zapps.me/docs/webhook/
+   * Parse webhook event payload.
+   * Supports both wrapped { ok, result: { event_name, message } }
+   * and flat payload { event_name, message, ... }.
    * @param {Object} payload - Parsed webhook body
-   * @returns {Object} Normalized event object
-   * @property {string} event - Event type (user_text, user_image, user_sticker, user_voice, etc.)
-   * @property {string} userId - Sender user ID (message.from.id)
-   * @property {string} chatId - Chat ID (message.chat.id)
-   * @property {string} [messageId] - Message ID
-   * @property {Object} [message] - Message content (text, photo, sticker, voice, etc.)
-   * @property {Object} raw - Original payload
-   * @example
-   * const event = bot.webhook.parseEvent(req.body);
-   * if (event.event === 'user_text') {
-   *   await bot.message.sendText(event.chatId, `You said: ${event.message.text}`);
-   * }
+   * @returns {Object} Normalized event: { event, eventName, userId, chatId, messageId, timestamp, message, raw }
    */
   parseEvent(payload) {
     if (!payload || typeof payload !== 'object') {
-      throw new Error('Invalid payload: must be an object');
+      throw new ZaloWebhookError('Invalid payload: expected an object', 400);
     }
 
-    const eventName = payload.event_name
-      || (payload.result && payload.result.event_name)
-      || null;
+    const result = payload.result && typeof payload.result === 'object'
+      ? payload.result
+      : payload;
+
+    const eventName = result.event_name || null;
     if (!eventName) {
-      throw new Error('Missing event_name field in payload');
+      throw new ZaloWebhookError('Missing event_name field in payload', 400);
     }
 
-    // Extract message from result wrapper or flat payload
-    const result = payload.result || payload;
     const msg = result.message || null;
-
-    // Zalo Bot API: userId from message.from.id, chatId from message.chat.id
     const userId = msg && msg.from ? msg.from.id : null;
-    const chatId = msg && msg.chat ? msg.chat.id : userId;
+    const chatId = (msg && msg.chat ? msg.chat.id : userId);
     if (!userId) {
-      throw new Error('Missing sender user ID in payload');
+      throw new ZaloWebhookError('Missing sender user ID in payload', 400);
     }
 
-    // Normalize event names
-    const eventMap = {
-      'message.text.received': 'user_text',
-      'message.image.received': 'user_image',
-      'message.sticker.received': 'user_sticker',
-      'message.voice.received': 'user_voice',
-      'message.unsupported.received': 'user_unsupported',
-      'user.follow': 'user_follow',
-      'user.unfollow': 'user_unfollow',
-    };
-    const normalizedEvent = eventMap[eventName] || eventName;
+    const normalizedEvent = EVENT_MAP[eventName] || eventName;
 
     const event = {
       event: normalizedEvent,
+      eventName,
       userId,
       chatId,
-      messageId: msg ? msg.message_id || null : null,
-      timestamp: msg ? msg.date || Date.now() : Date.now(),
+      messageId: msg ? (msg.message_id || null) : null,
+      timestamp: msg ? (msg.date || Date.now()) : Date.now(),
       raw: payload,
     };
 
-    // Attach message content based on type
     if (msg) {
       switch (normalizedEvent) {
         case 'user_text':
@@ -151,38 +133,43 @@ class WebhookModule {
   }
 
   /**
-   * Create Express.js middleware for webhook handling
-   * @param {Object} [options] - Middleware options
-   * @param {Function} [options.onEvent] - Async event handler function(event, req)
+   * Create Express.js middleware for webhook handling.
+   * @param {Object} [options]
+   * @param {Function} [options.onEvent] - Async handler: async (event, req, res) => void
+   * @param {boolean}  [options.acknowledgeImmediately] - Respond 200 before running handler
    * @returns {Function} Express middleware
-   * @example
-   * app.post('/webhook', bot.webhook.middleware({
-   *   async onEvent(event, req) {
-   *     if (event.event === 'user_text') {
-   *       await bot.message.sendText(event.chatId, 'Hello!');
-   *     }
-   *   }
-   * }));
    */
   middleware(options = {}) {
     const onEvent = options.onEvent || null;
+    const acknowledgeImmediately = !!options.acknowledgeImmediately;
+
     return async (req, res) => {
-      // Verify secret token
       if (!this.verify(req)) {
         return res.status(403).json({ message: 'Unauthorized' });
       }
 
+      let event;
       try {
-        const event = this.parseEvent(req.body);
-
-        if (onEvent && typeof onEvent === 'function') {
-          await onEvent(event, req);
-        }
-
-        res.status(200).json({ message: 'Success' });
+        event = this.parseEvent(req.body);
       } catch (error) {
-        console.error('[Zalo Webhook] Error:', error.message);
-        // Always return 200 to Zalo — errors should be logged, not returned
+        const status = error.status || 500;
+        console.error('[Zalo Webhook] Malformed payload:', error.message);
+        return res.status(status).json({ message: error.message });
+      }
+
+      if (acknowledgeImmediately) {
+        res.status(200).json({ message: 'Success' });
+      }
+
+      if (onEvent && typeof onEvent === 'function') {
+        try {
+          await onEvent(event, req, res);
+        } catch (error) {
+          console.error('[Zalo Webhook] Handler error:', error.message);
+        }
+      }
+
+      if (!res.headersSent) {
         res.status(200).json({ message: 'Success' });
       }
     };
@@ -194,20 +181,7 @@ class WebhookModule {
    * @returns {Function} Express middleware
    */
   handle(handler) {
-    return async (req, res) => {
-      if (!this.verify(req)) {
-        return res.status(403).json({ message: 'Unauthorized' });
-      }
-
-      try {
-        const event = this.parseEvent(req.body);
-        await handler(event);
-        res.status(200).json({ message: 'Success' });
-      } catch (error) {
-        console.error('[Zalo Webhook] Error:', error.message);
-        res.status(200).json({ message: 'Success' });
-      }
-    };
+    return this.middleware({ onEvent: handler });
   }
 }
 

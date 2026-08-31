@@ -26,7 +26,7 @@ app.use(express.json());
 // Initialize bot
 const bot = new ZaloBot({
   botToken: process.env.ZALO_BOT_TOKEN || 'YOUR_BOT_TOKEN',
-  secret: process.env.ZALO_BOT_SECRET || 'YOUR_SECRET',
+  secretKey: process.env.ZALO_BOT_SECRET || 'YOUR_SECRET',
 });
 
 // Simple webhook handler using middleware
@@ -75,11 +75,7 @@ async function handleTextMessage(chatId, text) {
   }
 
   if (lowerText.includes('help')) {
-    await bot.message.sendQuickReply(chatId, 'I can help you with:', [
-      { title: 'Info', payload: 'info' },
-      { title: 'Support', payload: 'support' },
-      { title: 'Contact', payload: 'contact' },
-    ]);
+    await bot.message.sendText(chatId, 'I can help you with: Info, Support, Contact');
     return;
   }
 

@@ -9,11 +9,11 @@
  * Reference: https://bot.zapps.me/docs/apis/sendMessage/
  */
 
-const { ZaloBot } = require('./src');
+const { ZaloBot } = require('../src');
 
 const bot = new ZaloBot({
   botToken: process.env.ZALO_BOT_TOKEN || 'YOUR_BOT_TOKEN',
-  secret: process.env.ZALO_BOT_SECRET || 'YOUR_SECRET',
+  secretKey: process.env.ZALO_BOT_SECRET || 'YOUR_SECRET',
 });
 
 // User ID for testing (replace with real ID)
@@ -42,20 +42,9 @@ async function sendSticker() {
   console.log('   ✅ message_id:', result.message_id);
 }
 
-// Demo: Send quick reply
-async function sendQuickReply() {
-  console.log('4️⃣ Send quick reply...');
-  const result = await bot.message.sendQuickReply(TEST_USER_ID, 'Choose an option:', [
-    { title: 'Info', payload: 'info' },
-    { title: 'Support', payload: 'support' }
-  ]);
-  console.log('   ✅ message_id:', result.message_id);
-}
-
 (async () => {
   await sendText();
   await sendImage();
   await sendSticker();
-  await sendQuickReply();
   console.log('✅ All demo messages sent successfully!');
 })();

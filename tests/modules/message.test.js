@@ -102,7 +102,7 @@ describe('MessageModule', () => {
     it('should throw when photo URL is missing', async () => {
       await assert.rejects(
         () => messageModule.sendPhoto('user123', null),
-        /photo URL is required/
+        /URL is required/
       );
     });
 
@@ -143,7 +143,7 @@ describe('MessageModule', () => {
     it('should throw when voice URL is missing', async () => {
       await assert.rejects(
         () => messageModule.sendVoice('user123', null),
-        /voiceUrl is required/
+        /URL is required/
       );
     });
   });

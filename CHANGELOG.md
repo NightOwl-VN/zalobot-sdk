@@ -4,7 +4,7 @@ All notable changes to the **Zalo Bot SDK** project will be documented in this f
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-08-31
 
 ### Added
 - **Initial Release**: Core SDK for Zalo Bot Platform (bot.zapps.me).
@@ -23,6 +23,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and fol
 - `ZaloWebhookError`: Webhook secret token verification failures.
 
 ### Infrastructure
-- Integrated `.env.example`, standard Node.js `.gitignore`.
+- Integrated `.env.example` for examples, standard Node.js `.gitignore`.
 - MIT License, contributing guide (`CONTRIBUTING.md`).
 - API Reference documentation in English (`docs/en/api-reference.md`).
+
+### Fixed
+- Examples corrected to use `secretKey` instead of deprecated `secret` option.
+- Fixed `require` path in `send-message.js` to use `../src`.
+- Removed references to non-existent `sendQuickReply` method in examples.
+- Updated `.gitignore` with `coverage/`, `dist/`, `*.tgz`, `.idea/`, `.vscode/`, `.nyc_output/`.
+
+## [Unreleased]
+
+Nothing yet.

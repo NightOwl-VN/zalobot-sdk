@@ -36,7 +36,7 @@ class UserModule {
       ...(options.fields && { fields: options.fields }),
     };
 
-    return this.client.get(`/${userId}`, params);
+    return this.client.get(userId, params);
   }
 
   /**
@@ -56,7 +56,7 @@ class UserModule {
       ...(params.cursor && { cursor: params.cursor }),
       ...(params.fields && { fields: params.fields }),
     };
-    return this.client.get('/me/followers', query);
+    return this.client.get('me/followers', query);
   }
 
   /**

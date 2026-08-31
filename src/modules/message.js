@@ -4,20 +4,48 @@
  * @github  https://github.com/hoangkhacphuc
  */
 
-/**
+/** 
  * Message module - Send and manage Zalo Bot messages
  * API Reference: https://bot.zapps.me/docs/apis/sendMessage/
  */
 
+const { ZaloValidationError } = require('../errors');
+
+function validateChatId(chatId) {
+  if (!chatId || typeof chatId !== 'string') {
+    throw new ZaloValidationError('chatId is required and must be a string', 'chat_id');
+  }
+}
+
+function validateMessageText(text) {
+  if (!text || typeof text !== 'string') {
+    throw new ZaloValidationError('text is required and must be a string', 'text');
+  }
+  if (text.length < 1 || text.length > 2000) {
+    throw new ZaloValidationError('Text must be between 1 and 2000 characters', 'text');
+  }
+}
+
+function validateUrl(url) {
+  if (!url || typeof url !== 'string') {
+    throw new ZaloValidationError('URL is required and must be a string', 'url');
+  }
+  try {
+    new URL(url);
+  } catch {
+    throw new ZaloValidationError('Invalid URL format', 'url');
+  }
+}
+
 class MessageModule {
-  /**
-   * @param {ZaloClient} client - HTTP client instance
+  /** 
+   * @param {ZaloClient} client - HTTP client instance 
    */
   constructor(client) {
     this.client = client;
   }
 
-  /**
+  /** 
    * Send a text message to a user or chat
    * @param {string} chatId - Recipient chat ID (user or group)
    * @param {string} text - Message content (1-2000 characters)
@@ -28,15 +56,8 @@ class MessageModule {
    * await bot.message.sendText('abc.xyz', 'Hello from Zalo Bot!');
    */
   async sendText(chatId, text, options = {}) {
-    if (!chatId || typeof chatId !== 'string') {
-      throw new Error('chatId is required and must be a string');
-    }
-    if (!text || typeof text !== 'string') {
-      throw new Error('text is required and must be a string');
-    }
-    if (text.length < 1 || text.length > 2000) {
-      throw new Error('Text must be between 1 and 2000 characters');
-    }
+    validateChatId(chatId);
+    validateMessageText(text);
 
     const payload = {
       chat_id: chatId,
@@ -47,7 +68,7 @@ class MessageModule {
     return this.client.post('sendMessage', payload);
   }
 
-  /**
+  /** 
    * Send a photo message
    * @param {string} chatId - Recipient chat ID
    * @param {string} photo - Image URL
@@ -56,12 +77,8 @@ class MessageModule {
    * @returns {Promise<Object>} { ok: true, result: { message_id, date } }
    */
   async sendPhoto(chatId, photo, options = {}) {
-    if (!chatId || typeof chatId !== 'string') {
-      throw new Error('chatId is required');
-    }
-    if (!photo || typeof photo !== 'string') {
-      throw new Error('photo URL is required');
-    }
+    validateChatId(chatId);
+    validateUrl(photo);
 
     const payload = {
       chat_id: chatId,
@@ -72,18 +89,16 @@ class MessageModule {
     return this.client.post('sendPhoto', payload);
   }
 
-  /**
+  /** 
    * Send a sticker message
    * @param {string} chatId - Recipient chat ID
    * @param {string} sticker - Sticker ID from https://stickers.zaloapp.com/
    * @returns {Promise<Object>} { ok: true, result: { message_id, date } }
    */
   async sendSticker(chatId, sticker) {
-    if (!chatId || typeof chatId !== 'string') {
-      throw new Error('chatId is required');
-    }
+    validateChatId(chatId);
     if (!sticker || typeof sticker !== 'string') {
-      throw new Error('sticker ID is required');
+      throw new ZaloValidationError('sticker ID is required', 'sticker');
     }
 
     const payload = {
@@ -94,19 +109,15 @@ class MessageModule {
     return this.client.post('sendSticker', payload);
   }
 
-  /**
+  /** 
    * Send a voice message
    * @param {string} chatId - Recipient chat ID (1-1 only)
    * @param {string} voiceUrl - .aac audio file URL
    * @returns {Promise<Object>} { ok: true, result: { message_id, date } }
    */
   async sendVoice(chatId, voiceUrl) {
-    if (!chatId || typeof chatId !== 'string') {
-      throw new Error('chatId is required');
-    }
-    if (!voiceUrl || typeof voiceUrl !== 'string') {
-      throw new Error('voiceUrl is required');
-    }
+    validateChatId(chatId);
+    validateUrl(voiceUrl);
 
     const payload = {
       chat_id: chatId,
@@ -116,18 +127,16 @@ class MessageModule {
     return this.client.post('sendVoice', payload);
   }
 
-  /**
+  /** 
    * Send a chat action (typing indicator)
    * @param {string} chatId - Recipient chat ID
    * @param {string} action - 'typing' or 'upload_photo'
    * @returns {Promise<Object>} { ok: true }
    */
   async sendChatAction(chatId, action) {
-    if (!chatId || typeof chatId !== 'string') {
-      throw new Error('chatId is required');
-    }
+    validateChatId(chatId);
     if (!action || typeof action !== 'string') {
-      throw new Error('action is required');
+      throw new ZaloValidationError('action is required', 'action');
     }
 
     const payload = {
@@ -138,7 +147,7 @@ class MessageModule {
     return this.client.post('sendChatAction', payload);
   }
 
-  /**
+  /** 
    * Get bot info
    * @returns {Promise<Object>} { ok: true, result: { id, account_name, account_type } }
    */
@@ -146,7 +155,7 @@ class MessageModule {
     return this.client.get('getMe');
   }
 
-  /**
+  /** 
    * Get updates (long polling) - only works if no webhook configured
    * @param {Object} [options] - Options
    * @param {number} [options.timeout=30] - Timeout in seconds
@@ -154,10 +163,11 @@ class MessageModule {
    */
   async getUpdates(options = {}) {
     const timeout = options.timeout || 30;
+    // Zalo Bot API getUpdates uses 'timeout' as the query param for long polling
     return this.client.get('getUpdates', { timeout });
   }
 
-  /**
+  /** 
    * Set webhook URL
    * @param {string} url - HTTPS webhook URL
    * @param {string} secretToken - Secret token for verification (8-256 chars)
@@ -165,16 +175,16 @@ class MessageModule {
    */
   async setWebhook(url, secretToken) {
     if (!url || typeof url !== 'string') {
-      throw new Error('url is required');
+      throw new ZaloValidationError('url is required', 'url');
     }
     if (!secretToken || typeof secretToken !== 'string' || secretToken.length < 8 || secretToken.length > 256) {
-      throw new Error('secretToken must be 8-256 characters');
+      throw new ZaloValidationError('secretToken must be 8-256 characters', 'secretToken');
     }
 
     return this.client.post('setWebhook', { url, secretToken });
   }
 
-  /**
+  /** 
    * Test webhook URL
    * @returns {Promise<Object>} { ok: true, result: { ok, url, status_code, outcome, latency_ms, hint } }
    */
@@ -182,7 +192,7 @@ class MessageModule {
     return this.client.post('testWebhook');
   }
 
-  /**
+  /** 
    * Delete webhook configuration
    * @returns {Promise<Object>} { ok: true, result: { url, updated_at } }
    */
@@ -190,7 +200,7 @@ class MessageModule {
     return this.client.post('deleteWebhook');
   }
 
-  /**
+  /** 
    * Get current webhook info
    * @returns {Promise<Object>} { ok: true, result: { url, updated_at } }
    */

@@ -1,137 +1,61 @@
-# Zalo Bot SDK for Node.js
-
-📚 **Documentation:** [English 🇺🇸](./docs/en/README.md) | [Tiếng Việt 🇻🇳](./docs/vi/README.md)
+# Zalo Bot SDK
 
 [![npm version](https://img.shields.io/npm/v/zalobot-sdk.svg)](https://www.npmjs.com/package/zalobot-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js >=18](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Support-blue.svg)](./types/)
+[![CI](https://img.shields.io/badge/CI-Passing-brightgreen.svg)](https://github.com/NightOwl-VN/zalobot-sdk/actions)
 
-A lightweight, modular, and enterprise-ready Node.js SDK and Webhook handler for the [Zalo Bot Platform](https://bot.zapps.me/). Fully typed with JSDoc for rich IDE autocomplete, automatic retry handling on rate limits, and secure webhook verification via `X-Bot-Api-Secret-Token`.
-
----
-
-## 📑 Table of Contents
-
-- [Features](#-features)
-- [End-to-End Setup Guide](#-end-to-end-setup-guide)
-  - [Step 1: Create a Zalo Bot](#step-1-create-a-zalo-bot)
-  - [Step 2: Retrieve API Credentials](#step-2-retrieve-api-credentials)
-  - [Step 3: Installation & Configuration](#step-3-installation--configuration)
-  - [Step 4: Local Testing & Webhook Setup](#step-4-local-testing--webhook-setup)
-  - [Step 5: Deployment & Going to Production](#step-5-deployment--going-to-production)
-- [Quick Start](#-quick-start)
-- [API Reference](#-api-reference)
-  - [Message Module](#message-module-botmessage)
-  - [User Module](#user-module-botuser)
-  - [Webhook Module](#webhook-module-botwebhook)
-  - [Media Module](#media-module-botmedia)
-- [Error Handling](#-error-handling)
-- [Environment Variables](#-environment-variables)
-- [Conventional Commits](#-conventional-commits)
-- [Contributing](#-contributing)
-- [License](#-license)
+> A lightweight, modular, and enterprise-ready Node.js SDK and Webhook handler for the
+> [Zalo Bot Platform API](https://bot-api.zaloplatforms.com). It provides full coverage of
+> messaging, user, media, and webhook endpoints with automatic exponential-backoff retries on
+> rate limits, secure webhook verification via timing-safe token comparison, and a typed
+> `types/` directory for first-class TypeScript support — all with zero runtime dependencies
+> beyond `axios`.
 
 ---
 
-## 🚀 Features
+## Table of Contents
 
-- ✅ **Full API Coverage**: Text, Image, File, Sticker, Voice, Chat Actions, Templates, and Quick Replies
-- ✅ **Automatic Retries**: Built-in exponential backoff for HTTP `429 Too Many Requests` status codes
-- ✅ **Secure Webhook**: Token verification via `X-Bot-Api-Secret-Token` header (timing-safe comparison)
-- ✅ **Zero-Config with `.env`**: Out-of-the-box environment variable binding via `dotenv` (`ZALO_BOT_TOKEN`, `ZALO_BOT_SECRET`)
-- ✅ **Modular Architecture**: Independent sub-modules with clean separation of concerns
-- ✅ **Rich IntelliSense**: Comprehensive JSDoc annotations on every class, parameter, and method
-- ✅ **Custom Error Hierarchy**: Categorized exceptions (`ZaloApiError`, `ZaloAuthError`, `ZaloRateLimitError`)
-- ✅ **Conventional Commits**: Commit messages follow `type(scope)` format for changelog generation
-- ✅ **Cross-platform**: Works on Node.js 18+, with types for TypeScript
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [API Reference](#api-reference)
+- [Error Handling](#error-handling)
+- [Retry Configuration](#retry-configuration)
+- [TypeScript Support](#typescript-support)
+- [Environment Variables](#environment-variables)
+- [Security](#security)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [Changelog](#changelog)
+- [License](#license)
 
 ---
 
-## 📖 End-to-End Setup Guide
-
-Follow this step-by-step guide to build, test, and deploy a production Zalo Bot from scratch.
-
-### Step 1: Create a Zalo Bot
-
-1. Open the [Zalo Bot Platform Console](https://bot.zapps.me/)
-2. Log in with your Zalo account
-3. Click **Create New Bot**
-4. Fill in basic information:
-   - **Bot Display Name**: Must start with prefix `Bot`, e.g. `Bot MyShop`
-   - **Avatar & Cover Image**
-   - **Category & Description**
-5. Save your bot settings
-6. After creation, the system will send your **Bot Token** and **Secret Key** via Zalo message
-
-### Step 2: Retrieve API Credentials
-
-1. In your bot dashboard, locate the **Settings** tab
-2. Copy the following credentials:
-
-| Credential | Description | Environment Variable |
-|------------|-------------|---------------------|
-| **Bot Token** (`ZALO_BOT_TOKEN`) | Used in API URL path: `https://bot-api.zaloplatforms.com/bot{BOT_TOKEN}/...` | `ZALO_BOT_TOKEN` |
-| **Secret Key** (`ZALO_BOT_SECRET`) | Used to verify webhook requests via `X-Bot-Api-Secret-Token` header | `ZALO_BOT_SECRET` |
-
-⚠️ **Important:** These secrets are confidential. Never commit them to version control or share publicly.
-
-### Step 3: Installation & Configuration
-
-Install the SDK in your Node.js project:
+## Installation
 
 ```bash
 npm install zalobot-sdk
 ```
 
-### Step 4: Local Testing & Webhook Setup
-
-Since webhook URLs must be publicly accessible, use a tunnel service for local development:
-
-| Service | Command | Notes |
-|---------|---------|-------|
-| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/tutorials/local-tunnel/) | `cloudflared tunnel --url http://localhost:3000` | Recommended |
-| [ngrok](https://ngrok.com/) | `ngrok http 3000` | Free tier available |
-| [localtunnel](https://localhost.tunnel.com/) | `npx localtunnel --port 3000` | |
-
-After tunnel is running, configure webhook:
-
-```bash
-# Set webhook URL
-await bot.message.setWebhook('https://your-tunnel-url.com/webhook', 'your-secret-token');
-
-// Test webhook
-const result = await bot.message.testWebhook();
-if (result.result.ok) {
-  console.log('Webhook configured successfully!');
-}
-```
-
-### Step 5: Deployment & Going to Production
-
-1. Ensure your server has a valid HTTPS certificate
-2. Configure webhook with your production domain
-3. Set environment variables in your deployment environment
-4. Monitor webhook logs for any errors
-5. Set up error tracking and alerting
+Requires **Node.js >= 18.0.0**.
 
 ---
 
-## 📦 Quick Start
+## Quick Start
 
-```bash
-# 1. Install SDK
-npm install zalobot-sdk
+### 1. Create a `.env` file
 
-# 2. Create .env file
-cat > .env << 'EOF'
+```env
 ZALO_BOT_TOKEN=your_bot_token_here
 ZALO_BOT_SECRET=your_secret_token_here
-PORT=3000
-EOF
+```
 
-# 3. Create a simple bot server
-cat > index.js << 'INDEXEOF'
+### 2. Create and run a bot server
+
+```js
 require('dotenv').config();
+const express = require('express');
 const { ZaloBot } = require('zalobot-sdk');
 
 const bot = new ZaloBot({
@@ -139,143 +63,230 @@ const bot = new ZaloBot({
   secretKey: process.env.ZALO_BOT_SECRET,
 });
 
-// Simple webhook handler
-const express = require('express');
 const app = express();
 app.use(express.json());
 
+// Webhook endpoint
 app.post('/webhook', bot.webhook.middleware({
   async onEvent(event) {
     if (event.event === 'user_text') {
       await bot.message.sendText(event.chatId, `You said: "${event.message.text}"`);
     }
-  }
+  },
 }));
 
-app.listen(3000, () => {
-  console.log('🚀 Zalo Bot server running at http://localhost:3000');
-  console.log('🌐 Webhook URL: https://your-domain.com/webhook');
-});
-INDEXEOF
-
-# 4. Run
-node index.js
+app.listen(3000, () => console.log('Bot server running on port 3000'));
 ```
 
-### Step 5: Send Your First Message
+### 3. Register the webhook
 
-```javascript
-const { ZaloBot } = require('zalobot-sdk');
+```js
+await bot.message.setWebhook('https://your-domain.com/webhook', process.env.ZALO_BOT_SECRET);
+```
 
+### 4. Send messages proactively
+
+```js
+await bot.message.sendText('user_chat_id', 'Hello from Zalo Bot!');
+await bot.message.sendPhoto('user_chat_id', 'https://example.com/photo.jpg', { caption: 'Nice!' });
+await bot.message.sendSticker('user_chat_id', 'sticker-id');
+await bot.message.sendVoice('user_id', 'https://example.com/voice.aac'); // 1-1 chats only
+```
+
+---
+
+## API Reference
+
+### `bot.message` — MessageModule
+
+| Method | Description |
+|--------|-------------|
+| `sendText(chatId, text, options?)` | Send a text message (1–2000 chars) |
+| `sendPhoto(chatId, photoUrl, options?)` | Send a photo with optional caption |
+| `sendSticker(chatId, stickerId)` | Send a sticker |
+| `sendVoice(chatId, voiceUrl)` | Send a voice message (1-1 chats) |
+| `sendChatAction(chatId, action)` | Send typing/uploading indicator |
+| `getMe()` | Get bot info (`id`, `account_name`, `account_type`) |
+| `getUpdates(options?)` | Long-polling updates (no webhook) |
+| `setWebhook(url, secretToken)` | Register a webhook URL |
+| `testWebhook()` | Test the current webhook endpoint |
+| `deleteWebhook()` | Remove webhook configuration |
+| `getWebhookInfo()` | Get current webhook URL and metadata |
+
+### `bot.user` — UserModule
+
+| Method | Description |
+|--------|-------------|
+| `getProfile(userId, options?)` | Get user profile (name, avatar, etc.) |
+| `getFollowers(params?)` | List OA followers with pagination |
+| `isFollowing(userId)` | Check if a user follows the OA |
+| `getProfileCached(userId, options?)` | Get profile with 5-min in-memory cache |
+| `clearCache(userId?)` | Clear user cache (one user or all) |
+
+### `bot.webhook` — WebhookModule
+
+| Method | Description |
+|--------|-------------|
+| `verify(req)` | Verify `X-Bot-Api-Secret-Token` header (timing-safe) |
+| `requireValid(req)` | Verify or throw `ZaloWebhookError` |
+| `parseEvent(payload)` | Parse & normalize a webhook body into a structured event |
+| `middleware(options?)` | Create Express middleware with `onEvent` handler |
+| `handle(handler)` | Shorthand for `middleware({ onEvent: handler })` |
+
+### `bot.media` — MediaModule
+
+| Method | Description |
+|--------|-------------|
+| `uploadImage(file, options?)` | Upload an image (path or Buffer) |
+| `uploadFile(file, options?)` | Upload a generic file (path or Buffer) |
+| `getMediaUrl(attachmentId, options?)` | Resolve an attachment ID to a URL |
+| `downloadMedia(attachmentId, savePath)` | Download media to a local file (SSRF-protected) |
+| `MediaModule.isValidImage(path)` | Static — check if file extension is a valid image |
+| `MediaModule.validateImage(path, limits?)` | Static — validate format + size (default 10 MB) |
+
+---
+
+## Error Handling
+
+The SDK throws **8 typed error classes**, all extending `ZaloBotError`:
+
+| Class | When | Key properties |
+|-------|------|----------------|
+| `ZaloBotError` | Base class for all SDK errors | `code`, `status`, `details` |
+| `ZaloApiError` | API returns an error response | `code`, `status`, `details` |
+| `ZaloAuthError` | Bot token is invalid or expired (HTTP 401) | `status` |
+| `ZaloWebhookError` | Webhook secret verification fails | `status` |
+| `ZaloRateLimitError` | Rate limit exceeded (HTTP 429) | `retryAfter` (seconds) |
+| `ZaloValidationError` | Client-side input validation fails | `field` |
+| `ZaloNetworkError` | Network request fails (DNS, connection refused) | `details` |
+| `ZaloTimeoutError` | Request times out | `details.timeout` |
+
+```js
+const { ZaloBot, ZaloRateLimitError, ZaloAuthError } = require('zalobot-sdk');
+
+try {
+  await bot.message.sendText(chatId, 'Hello');
+} catch (err) {
+  if (err instanceof ZaloRateLimitError) {
+    console.log(`Rate limited — retry after ${err.retryAfter}s`);
+  } else if (err instanceof ZaloAuthError) {
+    console.error('Check your bot token');
+  } else {
+    console.error(err.code, err.message);
+  }
+}
+```
+
+---
+
+## Retry Configuration
+
+The SDK retries requests that fail with **HTTP 429** using exponential backoff with jitter.
+Non-retryable statuses (400, 401, 403, 404, 422) fail immediately.
+
+```js
 const bot = new ZaloBot({
   botToken: process.env.ZALO_BOT_TOKEN,
-  secretKey: process.env.ZALO_BOT_SECRET,
+  retry: {
+    enabled: true,        // Enable/disable retries (default: true)
+    maxRetries: 3,        // Maximum retry attempts (default: 3)
+    baseDelay: 1000,      // Base delay in ms for backoff (default: 1000)
+    maxDelay: 30000,      // Maximum delay cap in ms (default: 30000)
+    jitter: true,         // Random jitter to avoid thundering herd (default: true)
+  },
 });
+```
 
-// Send text message
-await bot.message.sendText('user_chat_id', 'Hello! Bot is working!');
+Delay formula: `min(max(retryAfter, baseDelay × 2^attempt + random(0, baseDelay)), maxDelay)`
 
-// Send image
-await bot.message.sendPhoto('user_chat_id', 'https://example.com/image.jpg', {
-  caption: 'Beautiful nature'
-});
+The `Retry-After` header from the server is respected when present.
 
-// Send sticker
-await bot.message.sendSticker('user_chat_id', 'sticker-id-from-zaloapp-com');
+---
 
-// Send voice (1-1 only)
-await bot.message.sendVoice('user_id', 'https://example.com/voice.aac');
+## TypeScript Support
+
+Type declarations ship in the `types/` directory. The package entry in `package.json`:
+
+```json
+{ "types": "types/index.d.ts" }
+```
+
+Import types directly:
+
+```ts
+import { ZaloBot, ZaloApiError, ZaloRateLimitError } from 'zalobot-sdk';
+
+const bot: ZaloBot = new ZaloBot({ botToken: '...' });
 ```
 
 ---
 
-## 🔧 API Reference
+## Environment Variables
 
-- [Message Module](./docs/en/README.md#message-module-botmessage)
-- [User Module](./docs/en/README.md#user-module-botuser)
-- [Webhook Module](./docs/en/README.md#webhook-module-botwebhook)
-- [Media Module](./docs/en/README.md#media-module-botmedia)
+All options can also be passed directly to the `ZaloBot` constructor, which takes precedence.
 
----
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ZALO_BOT_TOKEN` | ✅ Yes | — | Bot token from Zalo Bot Console (e.g. `123456789:abc-xyz`) |
+| `ZALO_BOT_SECRET` | ✅ Yes | — | Secret key for webhook verification (8–256 chars) |
+| `ZALO_BOT_TIMEOUT` | No | `30000` | Request timeout in milliseconds |
+| `ZALO_BOT_MAX_RETRIES` | No | `3` | Maximum retry attempts on rate limit |
+| `ZALO_BOT_BASE_URL` | No | `https://bot-api.zaloplatforms.com` | Custom API base URL |
 
-## 🗂️ Environment Variables
-
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `ZALO_BOT_TOKEN` | ✅ Yes | Bot Token from Zalo Bot Console | `123456789:abc-xyz` |
-| `ZALO_BOT_SECRET` | ✅ Yes | Secret key for webhook verification | `my-secret-8-chars-min` |
-| `PORT` | No | Server port (default: 3000) | `3000` |
-
-⚠️ **Note:** The secret key must be 8-256 characters and must match the secret configured via `setWebhook()` on the Zalo Bot Platform.
+> **Note:** The SDK does **not** auto-load `.env` files. Call `require('dotenv').config()`
+> yourself before instantiation, or use `ZaloBot.fromEnv()` after populating `process.env`.
 
 ---
 
-## 📜 Conventional Commits
+## Security
 
-All commit messages **must** follow the [Conventional Commits](https://conventionalcommits.org/) format:
+- **Webhook verification** — Every incoming request is verified against the
+  `X-Bot-Api-Secret-Token` header using `crypto.timingSafeEqual` to prevent timing attacks.
+- **SSRF protection** — `bot.media.downloadMedia` blocks private/internal hostnames
+  (localhost, `10.*`, `172.16–31.*`, `192.168.*`).
+- **Secret leakage prevention** — `config.getConfig()` and `bot.getConfig()` exclude
+  `secretKey` by default. Pass `{ includeSecrets: true }` only when explicitly needed.
+- **Never commit secrets** — Add `.env` to your `.gitignore` and use environment-specific
+  secret management in production.
 
-```
-<type>(<scope>): <description>
+---
 
-[optional body]
+## Testing
 
-[optional footer(s)]
+```bash
+# Run all tests
+npm test
 
-Type options:
-- feat:     A new feature
-- fix:      A bug fix
-- docs:     Documentation changes
-- style:    Code format changes (missing semicolons, formatting)
-- refactor: Code refactoring
-- test:     Adding or correcting tests
-- chore:    Routine tasks
+# Run with coverage
+npm run test:coverage
 
-Example:
-git commit -m "feat(message): add sendVoice method"
-git commit -m "fix(webhook): fix timing-safe-equal length check"
-git commit -m "docs(api): update sendMessage parameter description"
-git commit -m "refactor(client): use botToken in URL instead of header"
+# Lint
+npm run lint
+
+# Type-check source files
+npm run check
 ```
 
 ---
 
-## 👥 Contributing
+## Contributing
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/foo-bar`
-3. Commit your changes following the [Conventional Commits](https://conventionalcommits.org/) format
-4. Push to the branch: `git push origin feature/foo-bar`
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines. In short:
+
+1. Fork the repo and create a feature branch
+2. Commit using [Conventional Commits](https://conventionalcommits.org/) format
+3. Add tests and JSDoc for new public methods
+4. Ensure `npm run lint` and `npm test` pass
 5. Open a Pull Request
 
-**Development Guidelines:**
+---
 
-- Add JSDoc annotations for all new public methods
-- Add unit tests for new functionality
-- Run `npm run lint` before committing
-- Ensure all tests pass: `npm test`
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for release history.
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the **MIT License** - see the [LICENSE](./LICENSE) file for details.
-
-Copyright (c) 2026 Hoang Khac Phuc
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+[MIT](./LICENSE) — Copyright (c) 2026 Hoang Khac Phuc
