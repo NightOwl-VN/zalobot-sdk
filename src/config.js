@@ -44,10 +44,11 @@ class ZaloConfig {
      * Zalo Bot Token used for API authentication (embedded in URL path).
      * @type {string|null}
      */
-    this.botToken = options.botToken
+    const rawToken = options.botToken
       ?? process.env.ZALO_BOT_TOKEN
       ?? process.env.BOT_TOKEN
       ?? null;
+    this.botToken = typeof rawToken === 'string' ? rawToken.trim() : rawToken;
 
     /**
      * Secret token used for webhook signature verification.

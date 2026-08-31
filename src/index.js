@@ -78,7 +78,13 @@ class ZaloBot {
     }
 
     // ZaloClient only needs botToken, timeout, baseURL, retry — NOT secretKey
-    this.client = new ZaloClient(this.config.toObject());
+    // CRITICAL: pass config fields directly (toObject() masks the token → 404!)
+    this.client = new ZaloClient({
+      botToken: this.config.botToken,
+      timeout: this.config.timeout,
+      maxRetries: this.config.maxRetries,
+      baseURL: this.config.baseURL,
+    });
 
     // Initialize modules — each receives the shared client
     this.message = new MessageModule(this.client);
