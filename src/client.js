@@ -57,7 +57,7 @@ class ZaloClient {
     }
 
     this.botToken = config.botToken;
-    this.timeout = config.timeout || 30000;
+    this.timeout = config.timeout ?? 30000;
 
     // apiBaseURL = platform host (e.g. "https://bot-api.zaloplatforms.com")
     // requestBaseURL = full URL used for all requests (apiBaseURL + /bot{token})
@@ -156,7 +156,10 @@ class ZaloClient {
    * @param {string} newToken - New bot token
    */
   updateBotToken(newToken) {
-    this.botToken = newToken;
+    if (typeof newToken !== 'string' || newToken.trim() === '') {
+      throw new ZaloAuthError('Invalid bot token — must be a non-empty string');
+    }
+    this.botToken = newToken.trim();
     this.requestBaseURL = `${this.apiBaseURL}/bot${newToken}`;
     this._axios.defaults.baseURL = this.requestBaseURL;
   }
@@ -255,6 +258,9 @@ class ZaloClient {
    * @private
    */
   _isRetryable(error) {
+    if (error instanceof ZaloRateLimitError) {
+      return true;
+    }
     if (!error.response) return false;
     return error.response.status === 429;
   }
