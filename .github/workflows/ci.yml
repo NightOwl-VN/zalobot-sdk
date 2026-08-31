@@ -51,8 +51,12 @@ jobs:
       - name: Verify no hardcoded secrets
         run: |
           echo "Scanning for hardcoded secrets..."
-          ! grep -rn "sk-\|ghp_\|token.*=.*['\"][a-zA-Z0-9_-]\{20,\}" src/ examples/ || {
+          ! grep -rnE "(sk-|ghp_|glpat-|xox[bpsar]-|AKIA[A-Z0-9]{16})" src/ examples/ || {
             echo "ERROR: Potential hardcoded secret detected!"
+            exit 1
+          }
+          ! grep -rnE "(ZALO_BOT_TOKEN|ZALO_BOT_SECRET|accessToken|secretKey)\s*[:=]\s*['\"][a-zA-Z0-9_-]{20,}['\"]" src/ examples/ || {
+            echo "ERROR: Potential hardcoded credential detected!"
             exit 1
           }
           echo "No hardcoded secrets found."
