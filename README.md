@@ -147,7 +147,7 @@ app.use(express.json());
 app.post('/webhook', bot.webhook.middleware({
   async onEvent(event) {
     if (event.event === 'user_text') {
-      await bot.message.sendText(event.chatId, `Bạn đã nói: "${event.message.text}"`);
+      await bot.message.sendText(event.chatId, `You said: "${event.message.text}"`);
     }
   }
 }));
@@ -173,11 +173,11 @@ const bot = new ZaloBot({
 });
 
 // Send text message
-await bot.message.sendText('user_chat_id', 'Xin chào! Bot hoạt động tốt rồi!');
+await bot.message.sendText('user_chat_id', 'Hello! Bot is working!');
 
 // Send image
 await bot.message.sendPhoto('user_chat_id', 'https://example.com/image.jpg', {
-  caption: 'Hình ảnh minh họa'
+  caption: 'Beautiful nature'
 });
 
 // Send sticker

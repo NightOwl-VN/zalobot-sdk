@@ -114,7 +114,7 @@ describe('WebhookModule', () => {
         result: {
           event_name: 'message.text.received',
           message: {
-            from: { id: '0e7279ebd6a13fff66b0', display_name: 'Hoàng', is_bot: false },
+            from: { id: '0e7279ebd6a13fff66b0', display_name: 'John', is_bot: false },
             chat: { id: '0e7279ebd6a13fff66b0', chat_type: 'PRIVATE' },
             text: 'Hello bot',
             message_id: '6003008fbd02235b7a14',

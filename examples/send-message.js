@@ -5,90 +5,57 @@
  */
 
 /**
- * Example: Send various types of messages using Zalo Bot SDK
- * 
- * Run: node examples/send-message.js
+ * Example: Send various message types via Zalo Bot SDK
+ * Reference: https://bot.zapps.me/docs/apis/sendMessage/
  */
 
-const { ZaloBot } = require('../src');
-require('dotenv').config();
+const { ZaloBot } = require('./src');
 
-// Initialize bot
 const bot = new ZaloBot({
-  accessToken: process.env.ZALO_ACCESS_TOKEN || 'YOUR_ACCESS_TOKEN',
-  secretKey: process.env.ZALO_SECRET_KEY || 'YOUR_SECRET_KEY',
+  botToken: process.env.ZALO_BOT_TOKEN || 'YOUR_BOT_TOKEN',
+  secret: process.env.ZALO_BOT_SECRET || 'YOUR_SECRET',
 });
 
-// Replace with actual user ID
-const USER_ID = process.env.ZALO_TEST_USER_ID || 'USER_ID_HERE';
+// User ID for testing (replace with real ID)
+const TEST_USER_ID = process.env.ZALO_BOT_TEST_USER_ID || 'user123456789';
 
-async function main() {
-  try {
-    console.log('🚀 Starting Zalo Bot examples...\n');
-
-    // 1. Send a text message
-    console.log('📝 Sending text message...');
-    await bot.message.sendText(USER_ID, 'Hello from Zalo Bot SDK! 👋');
-    console.log('✅ Text message sent\n');
-
-    // 2. Send a message with quick replies
-    console.log('📝 Sending quick reply message...');
-    await bot.message.sendQuickReply(
-      USER_ID,
-      'Chọn một tùy chọn:',
-      [
-        { title: 'Thông tin', payload: 'info' },
-        { title: 'Hỗ trợ', payload: 'support' },
-        { title: 'Liên hệ', payload: 'contact' },
-      ]
-    );
-    console.log('✅ Quick reply sent\n');
-
-    // 3. Get user profile
-    console.log('👤 Getting user profile...');
-    const user = await bot.user.getProfile(USER_ID);
-    console.log(`   User: ${user.name || 'N/A'}`);
-    console.log(`   Avatar: ${user.avatar || 'N/A'}`);
-    console.log(`   ID: ${user.id}`);
-    console.log('✅ Profile fetched\n');
-
-    // 4. Send a template message (buttons)
-    console.log('📝 Sending template message...');
-    await bot.message.sendTemplate(USER_ID, {
-      type: 'button',
-      elements: [
-        { title: 'Website', payload: 'website' },
-        { title: 'GitHub', payload: 'github' },
-        { title: 'Docs', payload: 'docs' },
-      ],
-    });
-    console.log('✅ Template sent\n');
-
-    // 5. Get conversation history
-    console.log('📜 Getting conversation history...');
-    const history = await bot.message.getConversation({
-      userId: USER_ID,
-      limit: 5,
-    });
-    console.log(`   Found ${history.data?.length || 0} messages`);
-    if (history.data && history.data.length > 0) {
-      history.data.forEach((msg, i) => {
-        console.log(`   ${i + 1}. ${msg.message?.text || '[non-text]'}`);
-      });
-    }
-    console.log('✅ History fetched\n');
-
-    console.log('✨ All examples completed successfully!');
-
-  } catch (error) {
-    console.error('❌ Error:', error.message);
-    if (error.response) {
-      console.error('   Status:', error.response.status);
-      console.error('   Data:', error.response.data);
-    }
-    process.exit(1);
-  }
+// Demo: Send text message
+async function sendText() {
+  console.log('1️⃣ Send text message...');
+  const result = await bot.message.sendText(TEST_USER_ID, 'Hello from Zalo Bot SDK!');
+  console.log('   ✅ message_id:', result.message_id);
 }
 
-// Run with error handling
-main().catch(console.error);
+// Demo: Send image
+async function sendImage() {
+  console.log('2️⃣ Send image message...');
+  const result = await bot.message.sendPhoto(TEST_USER_ID, 'https://example.com/image.jpg', {
+    caption: 'Beautiful nature!'
+  });
+  console.log('   ✅ message_id:', result.message_id);
+}
+
+// Demo: Send sticker
+async function sendSticker() {
+  console.log('3️⃣ Send sticker message...');
+  const result = await bot.message.sendSticker(TEST_USER_ID, 'sticker_id_abc123');
+  console.log('   ✅ message_id:', result.message_id);
+}
+
+// Demo: Send quick reply
+async function sendQuickReply() {
+  console.log('4️⃣ Send quick reply...');
+  const result = await bot.message.sendQuickReply(TEST_USER_ID, 'Choose an option:', [
+    { title: 'Info', payload: 'info' },
+    { title: 'Support', payload: 'support' }
+  ]);
+  console.log('   ✅ message_id:', result.message_id);
+}
+
+(async () => {
+  await sendText();
+  await sendImage();
+  await sendSticker();
+  await sendQuickReply();
+  console.log('✅ All demo messages sent successfully!');
+})();

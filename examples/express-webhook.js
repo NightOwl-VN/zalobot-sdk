@@ -10,7 +10,7 @@
  * Run: node examples/express-webhook.js
  * Endpoint: POST http://localhost:3000/webhook
  * 
- * Set this URL as your Zalo webhook endpoint:
+ * Set this URL as your Zalo Bot webhook endpoint:
  * https://your-domain.com/webhook
  */
 
@@ -25,8 +25,8 @@ app.use(express.json());
 
 // Initialize bot
 const bot = new ZaloBot({
-  accessToken: process.env.ZALO_ACCESS_TOKEN || 'YOUR_ACCESS_TOKEN',
-  secretKey: process.env.ZALO_SECRET_KEY || 'YOUR_SECRET_KEY',
+  botToken: process.env.ZALO_BOT_TOKEN || 'YOUR_BOT_TOKEN',
+  secret: process.env.ZALO_BOT_SECRET || 'YOUR_SECRET',
 });
 
 // Simple webhook handler using middleware
@@ -38,18 +38,18 @@ app.post('/webhook', bot.webhook.middleware({
     switch (event.event) {
       case 'user_text':
         const text = event.message?.text || '';
-        await handleTextMessage(event.userId, text);
+        await handleTextMessage(event.chatId, text);
         break;
 
       case 'user_quick_reply':
         const payload = event.message?.quickReply?.payload || '';
-        await handleQuickReply(event.userId, payload);
+        await handleQuickReply(event.chatId, payload);
         break;
 
       case 'user_follow':
         await bot.message.sendText(
-          event.userId,
-          'Cảm ơn bạn đã theo dõi! 🎉\nHãy gửi tin nhắn bất kỳ để tôi trả lời.'
+          event.chatId,
+          'Thanks for following! 🎉\nSend any message and I will reply!'
         );
         break;
 
@@ -66,43 +66,43 @@ app.post('/webhook', bot.webhook.middleware({
 /**
  * Handle text messages with simple bot logic
  */
-async function handleTextMessage(userId, text) {
+async function handleTextMessage(chatId, text) {
   const lowerText = text.toLowerCase().trim();
 
-  if (lowerText === 'hi' || lowerText === 'hello' || lowerText === 'xin chào') {
-    await bot.message.sendText(userId, 'Xin chào! Tôi có thể giúp gì cho bạn?');
+  if (lowerText === 'hi' || lowerText === 'hello') {
+    await bot.message.sendText(chatId, 'Hi! How can I help you?');
     return;
   }
 
-  if (lowerText.includes('help') || lowerText.includes('trợ giúp')) {
-    await bot.message.sendQuickReply(userId, 'Tôi có thể giúp bạn:', [
-      { title: 'Thông tin', payload: 'info' },
-      { title: 'Hỗ trợ', payload: 'support' },
-      { title: 'Liên hệ', payload: 'contact' },
+  if (lowerText.includes('help')) {
+    await bot.message.sendQuickReply(chatId, 'I can help you with:', [
+      { title: 'Info', payload: 'info' },
+      { title: 'Support', payload: 'support' },
+      { title: 'Contact', payload: 'contact' },
     ]);
     return;
   }
 
   // Default response
-  await bot.message.sendText(userId, `Bạn vừa gửi: "${text}"`);
+  await bot.message.sendText(chatId, `You sent: "${text}"`);
 }
 
 /**
  * Handle quick reply selections
  */
-async function handleQuickReply(userId, payload) {
+async function handleQuickReply(chatId, payload) {
   const responses = {
-    info: '📋 Đây là thông tin về chúng tôi...',
-    support: '🛠️ Bạn cần hỗ trợ gì? Vui lòng mô tả chi tiết.',
-    contact: '📞 Liên hệ: contact@example.com',
+    info: '📋 Here is our information...',
+    support: '🛠️ What do you need help with? Please describe in detail.',
+    contact: '📞 Contact: contact@example.com',
   };
 
-  const response = responses[payload] || `Bạn đã chọn: ${payload}`;
-  await bot.message.sendText(userId, response);
+  const response = responses[payload] || `You selected: ${payload}`;
+  await bot.message.sendText(chatId, response);
 }
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
