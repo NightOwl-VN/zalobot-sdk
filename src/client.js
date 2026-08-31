@@ -38,7 +38,7 @@ class ZaloClient {
     this.secretKey = config.secretKey || null;
     this.timeout = config.timeout || 30000;
     this.maxRetries = config.maxRetries || 3;
-    this.baseURL = `https://bot-api.zaloplatforms.com/bot${this.botToken}`;
+    this.baseURL = config.baseURL || `https://bot-api.zaloplatforms.com/bot${this.botToken}`;
 
     this.client = axios.create({
       baseURL: this.baseURL,
